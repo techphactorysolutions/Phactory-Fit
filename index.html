@@ -1,9 +1,12 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PhactoryFit">
   <meta name="description" content="PhactoryFit — private, adaptive nutrition and fitness tracking.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icon-192.png">
@@ -18,7 +21,7 @@
         <p class="eyebrow">TECH PHACTORY SOLUTIONS LLC</p>
         <h1>PhactoryFit</h1>
       </div>
-      <button id="dateButton" class="date-chip" aria-label="Choose date"></button>
+      <button type="button" id="dateButton" class="date-chip" aria-label="Choose date"></button>
     </header>
 
     <main id="app" tabindex="-1">
@@ -29,7 +32,7 @@
             <h2 id="greeting">Good evening, Sean</h2>
             <p id="coachHeadline" class="hero-copy"></p>
           </div>
-          <div class="score-ring" id="scoreRing" aria-label="Daily score">
+          <div class="score-ring" id="scoreRing" role="img" aria-label="Daily score: 0 percent">
             <span id="dailyScore">0</span><small>%</small>
           </div>
         </div>
@@ -50,12 +53,12 @@
         </div>
 
         <section class="section-card">
-          <div class="section-title"><div><p class="muted">Today</p><h3>Healthy habits</h3></div><button class="text-button" data-nav="diary">Open diary</button></div>
+          <div class="section-title"><div><p class="muted">Today</p><h3>Healthy habits</h3></div><button type="button" class="text-button" data-nav="diary">Open diary</button></div>
           <div class="habit-grid">
-            <button class="habit" id="waterHabit"><span>💧</span><strong id="waterValue">0</strong><small>cups</small></button>
-            <button class="habit" id="stepsHabit"><span>👟</span><strong id="stepsValue">0</strong><small>steps</small></button>
-            <button class="habit" id="workoutHabit"><span>🏋️</span><strong id="workoutValue">0</strong><small>minutes</small></button>
-            <button class="habit" id="sleepHabit"><span>🌙</span><strong id="sleepValue">0</strong><small>hours</small></button>
+            <button type="button" class="habit" id="waterHabit"><span>💧</span><strong id="waterValue">0</strong><small>cups</small></button>
+            <button type="button" class="habit" id="stepsHabit"><span>👟</span><strong id="stepsValue">0</strong><small>steps</small></button>
+            <button type="button" class="habit" id="workoutHabit"><span>🏋️</span><strong id="workoutValue">0</strong><small>minutes</small></button>
+            <button type="button" class="habit" id="sleepHabit"><span>🌙</span><strong id="sleepValue">0</strong><small>hours</small></button>
           </div>
         </section>
 
@@ -67,25 +70,25 @@
       </section>
 
       <section class="view" data-view="diary">
-        <div class="section-title page-heading"><div><p class="muted">Nutrition</p><h2>Food diary</h2></div><button id="voiceLogButton" class="secondary-button">🎙 Voice log</button></div>
+        <div class="section-title page-heading"><div><p class="muted">Nutrition</p><h2>Food diary</h2></div><button type="button" id="voiceLogButton" class="secondary-button">🎙 Voice log</button></div>
         <div id="mealSections"></div>
-        <button id="addFoodFab" class="fab" aria-label="Add food">+</button>
+        <button type="button" id="addFoodFab" class="fab" aria-label="Add food">+</button>
       </section>
 
       <section class="view" data-view="log">
         <div class="section-title page-heading"><div><p class="muted">Quick entry</p><h2>Log</h2></div></div>
         <div class="log-grid">
-          <button class="action-card" data-modal="food"><span>🍽️</span><strong>Food</strong><small>Search, scan, or create</small></button>
-          <button class="action-card" data-modal="barcode"><span>▥</span><strong>Barcode</strong><small>Scan once, remember locally</small></button>
-          <button class="action-card" data-modal="workout"><span>🏋️</span><strong>Workout</strong><small>Strength or cardio</small></button>
-          <button class="action-card" data-modal="weight"><span>⚖️</span><strong>Weight</strong><small>Trend-aware progress</small></button>
-          <button class="action-card" data-modal="water"><span>💧</span><strong>Water</strong><small>Fast hydration entry</small></button>
-          <button class="action-card" data-modal="habits"><span>✅</span><strong>Habits</strong><small>Steps and sleep</small></button>
+          <button type="button" class="action-card" data-modal="food"><span>🍽️</span><strong>Food</strong><small>Search, scan, or create</small></button>
+          <button type="button" class="action-card" data-modal="barcode"><span>▥</span><strong>Barcode</strong><small>Scan once, remember locally</small></button>
+          <button type="button" class="action-card" data-modal="workout"><span>🏋️</span><strong>Workout</strong><small>Strength or cardio</small></button>
+          <button type="button" class="action-card" data-modal="weight"><span>⚖️</span><strong>Weight</strong><small>Trend-aware progress</small></button>
+          <button type="button" class="action-card" data-modal="water"><span>💧</span><strong>Water</strong><small>Fast hydration entry</small></button>
+          <button type="button" class="action-card" data-modal="habits"><span>✅</span><strong>Habits</strong><small>Steps and sleep</small></button>
         </div>
       </section>
 
       <section class="view" data-view="progress">
-        <div class="section-title page-heading"><div><p class="muted">Trends, not noise</p><h2>Progress</h2></div><button class="secondary-button" data-modal="weight">Log weight</button></div>
+        <div class="section-title page-heading"><div><p class="muted">Trends, not noise</p><h2>Progress</h2></div><button type="button" class="secondary-button" data-modal="weight">Log weight</button></div>
         <div class="stats-row">
           <article><span>Current</span><strong id="currentWeight">—</strong></article>
           <article><span>Goal</span><strong id="goalWeight">—</strong></article>
@@ -93,7 +96,7 @@
         </div>
         <section class="section-card chart-card">
           <div class="section-title"><div><p class="muted">7-day trend</p><h3>Body weight</h3></div><span id="trendLabel" class="badge">Need data</span></div>
-          <canvas id="weightChart" width="700" height="320" aria-label="Weight trend chart"></canvas>
+          <canvas id="weightChart" width="700" height="320" role="img" aria-label="Weight trend chart"></canvas>
         </section>
         <section class="section-card">
           <div class="section-title"><div><p class="muted">Adaptive engine</p><h3>Weekly recommendation</h3></div></div>
@@ -123,35 +126,35 @@
         <div class="section-title page-heading"><div><p class="muted">Control center</p><h2>Settings</h2></div></div>
         <form id="settingsForm" class="settings-form section-card">
           <label>Name<input name="name" type="text" required></label>
-          <div class="two-col"><label>Current weight (lb)<input name="currentWeight" type="number" step="0.1" required></label><label>Goal weight (lb)<input name="goalWeight" type="number" step="0.1" required></label></div>
-          <div class="two-col"><label>Daily calories<input name="calorieGoal" type="number" required></label><label>Protein minimum (g)<input name="proteinGoal" type="number" required></label></div>
-          <div class="two-col"><label>Carb goal (g)<input name="carbGoal" type="number" required></label><label>Fat goal (g)<input name="fatGoal" type="number" required></label></div>
-          <label>Weekly goal (lb/week)<input name="weeklyGoal" type="number" step="0.1" min="-2" max="2" required></label>
+          <div class="two-col"><label>Current weight (lb)<input name="currentWeight" type="number" inputmode="decimal" min="40" max="1500" step="0.1" required></label><label>Goal weight (lb)<input name="goalWeight" type="number" inputmode="decimal" min="40" max="1500" step="0.1" required></label></div>
+          <div class="two-col"><label>Daily calories<input name="calorieGoal" type="number" inputmode="numeric" min="500" max="10000" required></label><label>Protein minimum (g)<input name="proteinGoal" type="number" inputmode="numeric" min="1" max="1000" required></label></div>
+          <div class="two-col"><label>Carb goal (g)<input name="carbGoal" type="number" inputmode="numeric" min="0" max="2000" required></label><label>Fat goal (g)<input name="fatGoal" type="number" inputmode="numeric" min="0" max="1000" required></label></div>
+          <label>Weekly goal (lb/week)<input name="weeklyGoal" type="number" inputmode="decimal" step="0.1" min="-2" max="2" required></label>
           <label class="toggle-row"><span><strong>Count exercise calories</strong><small>Off by default to prevent accidental overeating</small></span><input name="eatBackExercise" type="checkbox"></label>
           <button class="primary-button" type="submit">Save goals</button>
         </form>
         <section class="section-card">
           <div class="section-title"><div><p class="muted">Your data</p><h3>Backup and privacy</h3></div></div>
           <p class="body-copy">Your diary stays in this browser unless you export it. No account or private API key is required.</p>
-          <div class="button-stack"><button id="exportButton" class="secondary-button">Export backup</button><label class="secondary-button file-label">Import backup<input id="importInput" type="file" accept="application/json"></label><button id="resetButton" class="danger-button">Reset local data</button></div>
+          <div class="button-stack"><button type="button" id="exportButton" class="secondary-button">Export backup</button><label class="secondary-button file-label">Import backup<input id="importInput" type="file" accept="application/json"></label><button type="button" id="resetButton" class="danger-button">Reset local data</button></div>
         </section>
         <p class="branding">Designed by Tech Phactory Solutions LLC<br><span>Optional external food data: Open Food Facts (ODbL)</span></p>
       </section>
     </main>
 
     <nav class="bottom-nav" aria-label="Primary navigation">
-      <button class="active" data-view-target="today"><span>⌂</span><small>Today</small></button>
-      <button data-view-target="diary"><span>☷</span><small>Diary</small></button>
-      <button class="log-button" data-view-target="log"><span>＋</span><small>Log</small></button>
-      <button data-view-target="progress"><span>↗</span><small>Progress</small></button>
-      <button data-view-target="coach"><span>✦</span><small>Coach</small></button>
-      <button data-view-target="settings"><span>⚙</span><small>Settings</small></button>
+      <button type="button" class="active" data-view-target="today"><span>⌂</span><small>Today</small></button>
+      <button type="button" data-view-target="diary"><span>☷</span><small>Diary</small></button>
+      <button type="button" class="log-button" data-view-target="log"><span>＋</span><small>Log</small></button>
+      <button type="button" data-view-target="progress"><span>↗</span><small>Progress</small></button>
+      <button type="button" data-view-target="coach"><span>✦</span><small>Coach</small></button>
+      <button type="button" data-view-target="settings"><span>⚙</span><small>Settings</small></button>
     </nav>
   </div>
 
   <dialog id="modal">
     <div class="modal-shell">
-      <div class="modal-header"><div><p id="modalEyebrow" class="muted"></p><h2 id="modalTitle"></h2></div><button type="button" id="modalClose" class="icon-button" aria-label="Close">×</button></div>
+      <div class="modal-header"><div><p id="modalEyebrow" class="muted"></p><h2 id="modalTitle">Log</h2></div><button type="button" id="modalClose" class="icon-button" aria-label="Close">×</button></div>
       <div id="modalContent"></div>
     </div>
   </dialog>

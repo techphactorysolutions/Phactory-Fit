@@ -1,53 +1,52 @@
-# PhactoryFit v1
+# PhactoryFit v1.1.0
 
-PhactoryFit is an original, mobile-first nutrition and fitness tracker designed by **Tech Phactory Solutions LLC**. It is functionally inspired by modern calorie trackers but does not copy MyFitnessPal branding, code, or interface assets.
+PhactoryFit is an original, mobile-first nutrition and fitness tracker designed by **Tech Phactory Solutions LLC**. It provides a streamlined calorie-tracker workflow without copying MyFitnessPal branding, code, or interface assets.
 
-## Included in this build
+## Included
 
-- Daily calorie, protein, carbohydrate, and fat targets
-- Protein-floor protection and protein rescue suggestions
+- Daily calories, protein, carbohydrates, and fat goals
+- Protein-floor protection and exact protein-rescue shortcuts
 - Breakfast, lunch, dinner, and snack diary
 - Starter food library and custom foods
-- Local-learning barcode library: scan or enter a UPC/EAN, create the product once, and reuse it offline
-- Experimental camera barcode detection when the browser supports `BarcodeDetector`
-- Browser voice-to-search logging when speech recognition is supported
+- Local barcode learning
+- Optional Open Food Facts lookup through a configurable proxy
+- Experimental camera barcode detection where supported
+- Browser voice-to-search logging where supported
 - Workout, water, steps, sleep, and weight logging
 - Daily consistency score
-- Weight trend chart and cautious adaptive calorie recommendations
-- Local-first storage, JSON export/import, and reset controls
-- Installable Progressive Web App with offline app-shell caching
-- GitHub Pages compatible; no build tools required
+- Weight chart and trend-aware calorie guidance
+- Validated local storage with legacy/corrupt-data repair
+- JSON backup export and validated import
+- Installable PWA shell with offline caching
+- GitHub Pages compatibility with no build step
 
 ## GitHub Pages deployment
 
-1. Create a new GitHub repository.
-2. Upload **all files and folders inside this directory** to the repository root.
+1. Create or open the GitHub repository for PhactoryFit.
+2. Upload **all files and folders inside this directory** to the repository root, replacing the earlier version.
 3. Open **Settings → Pages**.
 4. Under **Build and deployment**, select **Deploy from a branch**.
 5. Select the `main` branch and `/ (root)`, then save.
 6. Open the generated GitHub Pages URL in Safari on iPhone.
-7. Tap **Share → Add to Home Screen**.
+7. Refresh once after the new service worker installs, then use **Share → Add to Home Screen**.
+
+Existing local diary data remains compatible because the storage key is unchanged and the new version migrates older data automatically.
+
+## Optional barcode proxy
+
+`config.js` contains an empty `offProxyUrl` value. Leave it empty for local barcode learning only. A production Open Food Facts integration should use a compliant server-side or serverless proxy rather than exposing private credentials in this public repository.
 
 ## Important limitations
 
-- Custom and barcode-linked nutrition should be verified against the product package.
-- `config.js` includes an optional blank `offProxyUrl`. A future production Open Food Facts integration should use a compliant backend/proxy so requests can include the required identifying User-Agent and observe caching/rate limits. Open Food Facts data is community-contributed and licensed under ODbL.
-- Camera barcode detection and browser speech recognition are not uniformly supported across browsers. Manual entry remains available.
-- The adaptive engine intentionally waits for multiple weigh-ins and adequate food logs before suggesting changes.
-- This app provides general fitness guidance and is not a substitute for medical care or individualized dietetic advice.
-- Data remains in the current browser unless manually exported. Clearing browser site data removes local entries.
+- Community food data must be verified against the product label.
+- Camera barcode detection and speech recognition vary by browser and device.
+- Apple Health requires a later native Capacitor wrapper; a normal website cannot directly access HealthKit.
+- Fitness recommendations are general guidance and are not medical care.
+- Clearing Safari website data removes local entries unless a backup was exported.
 
-## Next production phases
+## Verification
 
-- Compliant Open Food Facts proxy with caching and attribution
-- Supabase account sync and end-to-end row-level security
-- USDA FoodData Central search integration through a protected backend
-- Recipe builder and meal templates
-- Apple Health integration through a native Capacitor wrapper
-- Progress photos and body measurements
-- Strength-program builder with sets, reps, rest timers, and personal records
-- AI photo meal estimation with explicit confidence ranges and user correction learning
-- Subscription layer only for cloud-heavy features; core diary and barcode logging remain free
+See `AUDIT_REPORT.md` for the repaired defects, automated test coverage, browser checks, security review, and remaining hardware-dependent validation.
 
 ## Ownership
 

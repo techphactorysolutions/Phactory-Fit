@@ -2,6 +2,9 @@
 
 const STORAGE_KEY = 'phactoryfit.v1';
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+const VALID_VIEWS = new Set(['today', 'diary', 'log', 'progress', 'coach', 'settings']);
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 const starterFoods = [
   {id:'egg',name:'Large egg',brand:'Generic',serving:'1 egg',calories:72,protein:6.3,carbs:.4,fat:4.8,fiber:0,sugar:.2,sodium:71,aliases:['egg','eggs']},
   {id:'chicken',name:'Chicken breast, cooked',brand:'Generic',serving:'4 oz',calories:187,protein:35,carbs:0,fat:4,fiber:0,sugar:0,sodium:80,aliases:['chicken','chicken breast']},
@@ -26,23 +29,27 @@ const starterFoods = [
 ];
 
 const rescueFoods = [
-  {name:'Whey protein + water',protein:24,calories:120},
-  {name:'1 can tuna',protein:26,calories:120},
-  {name:'4 oz chicken breast',protein:35,calories:187},
-  {name:'Protein milk',protein:30,calories:150},
-  {name:'1 cup nonfat Greek yogurt',protein:23,calories:130},
-  {name:'4 oz cooked shrimp',protein:24,calories:112}
+  {foodId:'whey',label:'Whey protein + water',protein:24,calories:120},
+  {foodId:'tuna',label:'1 can tuna',protein:26,calories:120},
+  {foodId:'chicken',label:'4 oz chicken breast',protein:35,calories:187},
+  {foodId:'protein-milk',label:'Protein milk',protein:30,calories:150},
+  {foodId:'greek-yogurt',label:'1 cup nonfat Greek yogurt',protein:23,calories:130},
+  {foodId:'shrimp',label:'4 oz cooked shrimp',protein:24,calories:112}
 ];
 
 function localDateKey(date = new Date()) {
   const offset = date.getTimezoneOffset();
-  return new Date(date.getTime() - offset * 60000).toISOString().slice(0,10);
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
+}
+
+function emptyDay() {
+  return {foods:[],water:0,steps:0,workoutMinutes:0,exerciseCalories:0,sleep:0,notes:'',workoutName:'',workoutNotes:''};
 }
 
 function defaultState() {
   const today = localDateKey();
   return {
-    version: 1,
+    version: 2,
     selectedDate: today,
     profile: {name:'Sean',currentWeight:202,goalWeight:175,calorieGoal:2300,proteinGoal:200,carbGoal:230,fatGoal:77,weeklyGoal:-1,eatBackExercise:false},
     days: {[today]: emptyDay()},
@@ -53,16 +60,128 @@ function defaultState() {
   };
 }
 
-function emptyDay() {
-  return {foods:[],water:0,steps:0,workoutMinutes:0,exerciseCalories:0,sleep:0,notes:''};
+function toNumber(value, fallback = 0, min = -Infinity, max = Infinity) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+}
+
+function isDateKey(value) {
+  if (!DATE_PATTERN.test(String(value || ''))) return false;
+  const date = new Date(`${value}T12:00:00`);
+  return !Number.isNaN(date.getTime()) && localDateKey(date) === value;
+}
+
+function uid(prefix = 'id') {
+  if (globalThis.crypto?.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeFood(raw, fallbackId = uid('food')) {
+  if (!raw || typeof raw !== 'object') return null;
+  const name = String(raw.name || raw.product_name || '').trim();
+  if (!name) return null;
+  return {
+    id: String(raw.id || fallbackId),
+    name,
+    brand: String(raw.brand || raw.brands || 'Custom').trim() || 'Custom',
+    serving: String(raw.serving || raw.serving_size || '1 serving').trim() || '1 serving',
+    calories: round(toNumber(raw.calories, 0, 0, 100000), 4),
+    protein: round(toNumber(raw.protein, 0, 0, 10000), 4),
+    carbs: round(toNumber(raw.carbs, 0, 0, 10000), 4),
+    fat: round(toNumber(raw.fat, 0, 0, 10000), 4),
+    fiber: round(toNumber(raw.fiber, 0, 0, 10000), 4),
+    sugar: round(toNumber(raw.sugar, 0, 0, 10000), 4),
+    sodium: round(toNumber(raw.sodium, 0, 0, 1000000), 4),
+    aliases: Array.isArray(raw.aliases) ? raw.aliases.map(alias => String(alias).toLowerCase()).filter(Boolean).slice(0, 30) : [],
+    barcode: raw.barcode ? String(raw.barcode).replace(/\D/g, '').slice(0, 14) : null,
+    source: raw.source ? String(raw.source) : undefined
+  };
+}
+
+function normalizeLogEntry(raw) {
+  const food = normalizeFood(raw, String(raw?.id || uid('logged-food')));
+  if (!food) return null;
+  return {
+    ...food,
+    meal: MEALS.includes(raw.meal) ? raw.meal : 'Breakfast',
+    quantity: toNumber(raw.quantity, 1, 0.01, 1000),
+    logId: String(raw.logId || uid('log'))
+  };
+}
+
+function normalizeDay(raw) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  return {
+    foods: Array.isArray(source.foods) ? source.foods.map(normalizeLogEntry).filter(Boolean).slice(0, 5000) : [],
+    water: toNumber(source.water, 0, 0, 1000),
+    steps: Math.round(toNumber(source.steps, 0, 0, 1000000)),
+    workoutMinutes: toNumber(source.workoutMinutes, 0, 0, 1440),
+    exerciseCalories: toNumber(source.exerciseCalories, 0, 0, 20000),
+    sleep: toNumber(source.sleep, 0, 0, 24),
+    notes: String(source.notes || '').slice(0, 5000),
+    workoutName: String(source.workoutName || '').slice(0, 200),
+    workoutNotes: String(source.workoutNotes || '').slice(0, 2000)
+  };
+}
+
+function normalizeState(raw) {
+  const base = defaultState();
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const incomingProfile = source.profile && typeof source.profile === 'object' ? source.profile : {};
+  const profile = {
+    name: String(incomingProfile.name || base.profile.name).trim().slice(0, 80) || base.profile.name,
+    currentWeight: toNumber(incomingProfile.currentWeight, base.profile.currentWeight, 40, 1500),
+    goalWeight: toNumber(incomingProfile.goalWeight, base.profile.goalWeight, 40, 1500),
+    calorieGoal: Math.round(toNumber(incomingProfile.calorieGoal, base.profile.calorieGoal, 500, 10000)),
+    proteinGoal: Math.round(toNumber(incomingProfile.proteinGoal, base.profile.proteinGoal, 1, 1000)),
+    carbGoal: Math.round(toNumber(incomingProfile.carbGoal, base.profile.carbGoal, 0, 2000)),
+    fatGoal: Math.round(toNumber(incomingProfile.fatGoal, base.profile.fatGoal, 0, 1000)),
+    weeklyGoal: toNumber(incomingProfile.weeklyGoal, base.profile.weeklyGoal, -2, 2),
+    eatBackExercise: Boolean(incomingProfile.eatBackExercise)
+  };
+
+  const days = {};
+  if (source.days && typeof source.days === 'object' && !Array.isArray(source.days)) {
+    Object.entries(source.days).slice(0, 5000).forEach(([date, day]) => {
+      if (isDateKey(date)) days[date] = normalizeDay(day);
+    });
+  }
+
+  const weightsByDate = new Map();
+  if (Array.isArray(source.weights)) {
+    source.weights.slice(0, 10000).forEach(entry => {
+      if (!entry || !isDateKey(entry.date)) return;
+      const weight = toNumber(entry.weight, NaN, 40, 1500);
+      if (Number.isFinite(weight)) weightsByDate.set(entry.date, {date:entry.date,weight});
+    });
+  }
+  if (!weightsByDate.size) weightsByDate.set(localDateKey(), {date:localDateKey(),weight:profile.currentWeight});
+  const weights = [...weightsByDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  profile.currentWeight = weights.at(-1).weight;
+
+  const customFoods = Array.isArray(source.customFoods)
+    ? source.customFoods.map((food, index) => normalizeFood(food, `custom-${index}-${Date.now()}`)).filter(Boolean).slice(0, 10000)
+    : [];
+
+  const selectedDate = isDateKey(source.selectedDate) ? source.selectedDate : localDateKey();
+  if (!days[selectedDate]) days[selectedDate] = emptyDay();
+
+  return {
+    version: 2,
+    selectedDate,
+    profile,
+    days,
+    weights,
+    customFoods,
+    recentFoodIds: Array.isArray(source.recentFoodIds) ? [...new Set(source.recentFoodIds.map(String))].slice(0, 12) : [],
+    createdAt: typeof source.createdAt === 'string' ? source.createdAt : base.createdAt
+  };
 }
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState();
-    const parsed = JSON.parse(raw);
-    return {...defaultState(),...parsed,profile:{...defaultState().profile,...parsed.profile}};
+    return raw ? normalizeState(JSON.parse(raw)) : defaultState();
   } catch (error) {
     console.error('Could not load state', error);
     return defaultState();
@@ -70,13 +189,22 @@ function loadState() {
 }
 
 let state = loadState();
-const $ = (selector, root=document) => root.querySelector(selector);
-const $$ = (selector, root=document) => [...root.querySelectorAll(selector)];
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const modal = $('#modal');
 let toastTimer;
+let activeMediaStream = null;
+let modalContext = {meal:'Breakfast'};
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch (error) {
+    console.error('Could not save state', error);
+    if ($('#toast')) toast('Storage is full or unavailable. Export a backup before continuing.');
+    return false;
+  }
 }
 
 function getDay(date = state.selectedDate) {
@@ -84,39 +212,72 @@ function getDay(date = state.selectedDate) {
   return state.days[date];
 }
 
+function peekDay(date = state.selectedDate) {
+  return state.days[date] || emptyDay();
+}
+
 function allFoods() {
   return [...starterFoods, ...state.customFoods];
 }
 
-function round(value, places=0) {
+function round(value, places = 0) {
   const factor = 10 ** places;
   return Math.round((Number(value) || 0) * factor) / factor;
 }
 
-function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
-function escapeHtml(value='') { return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
+}
 
 function totalsFor(date = state.selectedDate) {
-  const day = getDay(date);
-  const totals = day.foods.reduce((acc, entry) => {
-    ['calories','protein','carbs','fat','fiber','sugar','sodium'].forEach(k => acc[k] += (Number(entry[k]) || 0) * (Number(entry.quantity) || 1));
-    return acc;
-  },{calories:0,protein:0,carbs:0,fat:0,fiber:0,sugar:0,sodium:0});
-  Object.keys(totals).forEach(k => totals[k] = round(totals[k],1));
+  const day = peekDay(date);
+  const totals = day.foods.reduce((accumulator, entry) => {
+    const quantity = toNumber(entry.quantity, 1, 0, 1000);
+    ['calories','protein','carbs','fat','fiber','sugar','sodium'].forEach(key => {
+      accumulator[key] += toNumber(entry[key], 0, 0, 1000000) * quantity;
+    });
+    return accumulator;
+  }, {calories:0,protein:0,carbs:0,fat:0,fiber:0,sugar:0,sodium:0});
+  Object.keys(totals).forEach(key => { totals[key] = round(totals[key], 1); });
   return totals;
 }
 
 function effectiveCalorieGoal(day = getDay()) {
-  return state.profile.calorieGoal + (state.profile.eatBackExercise ? Number(day.exerciseCalories || 0) : 0);
+  return Math.max(1, state.profile.calorieGoal + (state.profile.eatBackExercise ? Number(day.exerciseCalories || 0) : 0));
 }
 
 function dateLabel(dateKey) {
   const date = new Date(`${dateKey}T12:00:00`);
   const today = localDateKey();
-  const yesterday = localDateKey(new Date(Date.now()-86400000));
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = localDateKey(yesterdayDate);
   if (dateKey === today) return 'Today';
   if (dateKey === yesterday) return 'Yesterday';
-  return date.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  return date.toLocaleDateString(undefined, {month:'short',day:'numeric'});
+}
+
+function latestWeight() {
+  return [...state.weights].sort((a, b) => a.date.localeCompare(b.date)).at(-1) || null;
+}
+
+function syncCurrentWeight() {
+  const latest = latestWeight();
+  if (latest) state.profile.currentWeight = latest.weight;
+}
+
+function recordWeight(date, weight) {
+  const value = toNumber(weight, NaN, 40, 1500);
+  if (!isDateKey(date) || date > localDateKey() || !Number.isFinite(value)) return false;
+  state.weights = state.weights.filter(entry => entry.date !== date);
+  state.weights.push({date,weight:value});
+  state.weights.sort((a, b) => a.date.localeCompare(b.date));
+  syncCurrentWeight();
+  return true;
 }
 
 function computeScore() {
@@ -125,12 +286,12 @@ function computeScore() {
   const calorieGoal = effectiveCalorieGoal(day);
   let score = 0;
   const calorieRatio = totals.calories / calorieGoal;
-  if (totals.calories > 0) score += calorieRatio >= .9 && calorieRatio <= 1.1 ? 25 : clamp((1-Math.abs(1-calorieRatio))*25,0,22);
-  score += clamp(totals.protein/state.profile.proteinGoal,0,1)*25;
-  score += clamp(day.water/8,0,1)*10;
-  score += clamp(day.steps/8000,0,1)*10;
-  score += clamp(day.workoutMinutes/30,0,1)*15;
-  score += clamp(day.sleep/7,0,1)*15;
+  if (totals.calories > 0) score += calorieRatio >= .9 && calorieRatio <= 1.1 ? 25 : clamp((1 - Math.abs(1 - calorieRatio)) * 25, 0, 22);
+  score += clamp(totals.protein / Math.max(1, state.profile.proteinGoal), 0, 1) * 25;
+  score += clamp(day.water / 8, 0, 1) * 10;
+  score += clamp(day.steps / 8000, 0, 1) * 10;
+  score += clamp(day.workoutMinutes / 30, 0, 1) * 15;
+  score += clamp(day.sleep / 7, 0, 1) * 15;
   return round(score);
 }
 
@@ -141,11 +302,11 @@ function coachInsight() {
   const proteinLeft = Math.max(0, state.profile.proteinGoal - totals.protein);
   const caloriesLeft = goal - totals.calories;
   if (totals.calories === 0) return {title:'Start with your first meal',body:'Logging one meal is enough to begin. PhactoryFit will update your remaining calories and protect your protein minimum automatically.',actions:['Log breakfast','Scan a barcode']};
-  if (proteinLeft > 50 && caloriesLeft < 500) return {title:'Protein needs attention',body:`You have about ${round(proteinLeft)} g of protein left with ${round(caloriesLeft)} calories remaining. Choose a lean protein source before adding calorie-dense extras.`,actions:['Open protein rescue','Log food']};
-  if (totals.protein >= state.profile.proteinGoal && totals.calories <= goal) return {title:'Protein floor secured',body:`You reached ${round(totals.protein)} g of protein and still have ${Math.max(0,round(caloriesLeft))} calories available. Finish the day based on hunger and training needs.`,actions:['Review diary']};
   if (totals.calories > goal * 1.1) return {title:'No punishment needed',body:`You are ${round(Math.abs(caloriesLeft))} calories over today’s target. Keep logging accurately and return to the normal plan tomorrow instead of crash-restricting.`,actions:['Review diary']};
+  if (proteinLeft > 50 && caloriesLeft < 500) return {title:'Protein needs attention',body:`You have about ${round(proteinLeft)} g of protein left with ${Math.max(0, round(caloriesLeft))} calories remaining. Choose a lean protein source before adding calorie-dense extras.`,actions:['Open protein rescue','Log food']};
+  if (totals.protein >= state.profile.proteinGoal && totals.calories <= goal) return {title:'Protein floor secured',body:`You reached ${round(totals.protein)} g of protein and still have ${Math.max(0, round(caloriesLeft))} calories available. Finish the day based on hunger and training needs.`,actions:['Review diary']};
   if (day.sleep > 0 && day.sleep < 6) return {title:'Recovery may limit performance',body:`You logged ${day.sleep} hours of sleep. Keep training flexible today and prioritize a normal bedtime rather than forcing extra volume.`,actions:['Update sleep']};
-  return {title:'You are on track',body:`You have ${Math.max(0,round(caloriesLeft))} calories and ${round(proteinLeft)} g of protein remaining. Your next meal should be built around protein first.`,actions:['Log food','Open protein rescue']};
+  return {title:'You are on track',body:`You have ${Math.max(0, round(caloriesLeft))} calories and ${round(proteinLeft)} g of protein remaining. Your next meal should be built around protein first.`,actions:['Log food','Open protein rescue']};
 }
 
 function render() {
@@ -158,22 +319,31 @@ function render() {
 
   $('#dateButton').textContent = dateLabel(state.selectedDate);
   const hour = new Date().getHours();
-  $('#greeting').textContent = `${hour<12?'Good morning':hour<18?'Good afternoon':'Good evening'}, ${profile.name}`;
+  $('#greeting').textContent = `${hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'}, ${profile.name}`;
   $('#coachHeadline').textContent = score >= 80 ? 'Strong consistency today. Keep the finish simple.' : score >= 45 ? 'A few focused actions can turn this into a strong day.' : 'Start small: log the next thing you eat or drink.';
   $('#dailyScore').textContent = score;
   $('#scoreRing').style.background = `conic-gradient(var(--accent) ${score}%,rgba(255,255,255,.14) ${score}%)`;
+  $('#scoreRing').setAttribute('aria-label', `Daily score: ${score} percent`);
 
-  setText('caloriesConsumed', round(totals.calories)); setText('calorieGoal', round(calorieGoal));
-  setText('caloriesRemaining', `${round(calorieGoal-totals.calories)} left`);
-  $('#calorieBar').style.width = `${clamp(totals.calories/calorieGoal*100,0,100)}%`;
-  setText('proteinConsumed', round(totals.protein)); setText('proteinGoal', profile.proteinGoal);
-  setText('proteinRemaining', `${Math.max(0,round(profile.proteinGoal-totals.protein))}g left`);
-  $('#proteinBar').style.width = `${clamp(totals.protein/profile.proteinGoal*100,0,100)}%`;
-  setText('carbConsumed', `${round(totals.carbs)}g`); setText('fatConsumed', `${round(totals.fat)}g`);
-  setText('carbGoalText', `Goal ${profile.carbGoal} g`); setText('fatGoalText', `Goal ${profile.fatGoal} g`);
-  setText('waterValue', day.water); setText('stepsValue', day.steps.toLocaleString()); setText('workoutValue', day.workoutMinutes); setText('sleepValue', day.sleep);
-  setText('insightTitle', insight.title); setText('insightBody', insight.body);
-  $('#coachActions').innerHTML = insight.actions.map(a=>`<button class="chip" data-coach-action="${escapeHtml(a)}">${escapeHtml(a)}</button>`).join('');
+  setText('caloriesConsumed', round(totals.calories));
+  setText('calorieGoal', round(calorieGoal));
+  setText('caloriesRemaining', totals.calories > calorieGoal ? `${round(totals.calories - calorieGoal)} over` : `${round(calorieGoal - totals.calories)} left`);
+  $('#calorieBar').style.width = `${clamp(totals.calories / calorieGoal * 100, 0, 100)}%`;
+  setText('proteinConsumed', round(totals.protein));
+  setText('proteinGoal', profile.proteinGoal);
+  setText('proteinRemaining', totals.protein > profile.proteinGoal ? `${round(totals.protein - profile.proteinGoal)}g over` : `${Math.max(0, round(profile.proteinGoal - totals.protein))}g left`);
+  $('#proteinBar').style.width = `${clamp(totals.protein / Math.max(1, profile.proteinGoal) * 100, 0, 100)}%`;
+  setText('carbConsumed', `${round(totals.carbs)}g`);
+  setText('fatConsumed', `${round(totals.fat)}g`);
+  setText('carbGoalText', `Goal ${profile.carbGoal} g`);
+  setText('fatGoalText', `Goal ${profile.fatGoal} g`);
+  setText('waterValue', round(day.water, 1));
+  setText('stepsValue', Math.round(day.steps).toLocaleString());
+  setText('workoutValue', round(day.workoutMinutes));
+  setText('sleepValue', round(day.sleep, 2));
+  setText('insightTitle', insight.title);
+  setText('insightBody', insight.body);
+  $('#coachActions').innerHTML = insight.actions.map(action => `<button class="chip" data-coach-action="${escapeHtml(action)}">${escapeHtml(action)}</button>`).join('');
 
   renderDiary();
   renderProgress();
@@ -182,281 +352,683 @@ function render() {
   saveState();
 }
 
-function setText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
+function setText(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = value;
+}
 
 function renderDiary() {
   const day = getDay();
   $('#mealSections').innerHTML = MEALS.map(meal => {
-    const entries = day.foods.filter(f=>f.meal===meal);
-    const cals = round(entries.reduce((sum,e)=>sum+e.calories*e.quantity,0));
-    return `<section class="meal-section"><div class="meal-header"><span>${meal}</span><small>${cals} kcal</small></div>${entries.length ? entries.map(entry=>`<div class="food-row"><div><h4>${escapeHtml(entry.name)}</h4><p>${escapeHtml(entry.serving)} × ${entry.quantity} · ${round(entry.protein*entry.quantity)}g protein</p></div><div><strong>${round(entry.calories*entry.quantity)} kcal</strong><button class="remove-food" data-remove-food="${entry.logId}" aria-label="Remove ${escapeHtml(entry.name)}">×</button></div></div>`).join('') : `<button class="empty-meal" data-add-meal="${meal}">+ Add ${meal.toLowerCase()}</button>`}</section>`;
+    const entries = day.foods.filter(food => food.meal === meal);
+    const calories = round(entries.reduce((sum, entry) => sum + entry.calories * entry.quantity, 0));
+    const body = entries.length
+      ? entries.map(entry => `<div class="food-row"><div><h4>${escapeHtml(entry.name)}</h4><p>${escapeHtml(entry.serving)} × ${round(entry.quantity, 2)} · ${round(entry.protein * entry.quantity)}g protein</p></div><div><strong>${round(entry.calories * entry.quantity)} kcal</strong><button type="button" class="remove-food" data-remove-food="${escapeHtml(entry.logId)}" aria-label="Remove ${escapeHtml(entry.name)}">×</button></div></div>`).join('')
+      : `<button type="button" class="empty-meal" data-add-meal="${meal}">+ Add ${meal.toLowerCase()}</button>`;
+    return `<section class="meal-section"><div class="meal-header"><span>${meal}</span><small>${calories} kcal</small></div>${body}</section>`;
   }).join('');
 }
 
 function renderProgress() {
-  const weights = [...state.weights].sort((a,b)=>a.date.localeCompare(b.date));
+  const weights = [...state.weights].sort((a, b) => a.date.localeCompare(b.date));
   const latest = weights.at(-1)?.weight ?? state.profile.currentWeight;
   const first = weights[0]?.weight ?? latest;
-  setText('currentWeight', `${round(latest,1)} lb`); setText('goalWeight', `${round(state.profile.goalWeight,1)} lb`);
-  const change = round(latest-first,1); setText('weightChange', `${change>0?'+':''}${change} lb`);
+  setText('currentWeight', `${round(latest, 1)} lb`);
+  setText('goalWeight', `${round(state.profile.goalWeight, 1)} lb`);
+  const change = round(latest - first, 1);
+  setText('weightChange', `${change > 0 ? '+' : ''}${change} lb`);
   const recommendation = adaptiveRecommendation(weights);
-  setText('adaptiveRecommendation', recommendation.body); setText('trendLabel', recommendation.label);
+  setText('adaptiveRecommendation', recommendation.body);
+  setText('trendLabel', recommendation.label);
   renderWeightChart(weights.slice(-30));
   renderConsistency();
 }
 
-function adaptiveRecommendation(weights) {
-  if (weights.length < 4) return {label:'Need data',body:'Log at least four morning weigh-ins and keep your food diary reasonably complete. No calorie adjustment will be suggested until the trend is meaningful.'};
-  const sorted = [...weights].sort((a,b)=>a.date.localeCompare(b.date));
-  const recent = sorted.slice(-3);
-  const prior = sorted.slice(-6,-3);
-  if (prior.length < 3) return {label:'Learning',body:'The trend engine is learning your normal fluctuations. Keep calories stable and continue logging.'};
-  const recentAvg = recent.reduce((s,x)=>s+x.weight,0)/recent.length;
-  const priorAvg = prior.reduce((s,x)=>s+x.weight,0)/prior.length;
-  const days = Math.max(1,(new Date(`${recent.at(-1).date}T12:00:00`) - new Date(`${prior[0].date}T12:00:00`))/86400000);
-  const weeklyRate = (recentAvg-priorAvg)/days*7;
-  const desired = Number(state.profile.weeklyGoal);
-  const adherence = diaryAdherence(7);
-  if (adherence < .6) return {label:'Hold calories',body:`Your estimated trend is ${weeklyRate>0?'+':''}${round(weeklyRate,2)} lb/week, but fewer than 60% of recent days have usable nutrition logs. Keep the current target until the input data is more consistent.`};
-  if (Math.abs(weeklyRate-desired) <= .35) return {label:'On target',body:`Your estimated trend is ${weeklyRate>0?'+':''}${round(weeklyRate,2)} lb/week, close to the ${desired} lb/week plan. Keep calories at ${state.profile.calorieGoal}.`};
-  if (desired < 0 && weeklyRate > desired + .35) return {label:'Review −100 kcal',body:`Your estimated trend is ${weeklyRate>0?'+':''}${round(weeklyRate,2)} lb/week, slower than the ${desired} lb/week goal. A cautious option is reducing the daily target by about 100 calories, then reassessing after another week.`};
-  if (desired < 0 && weeklyRate < desired - .35) return {label:'Review +100 kcal',body:`Your estimated trend is ${round(weeklyRate,2)} lb/week, faster than the ${desired} lb/week goal. A cautious option is adding about 100 calories per day to improve sustainability and training recovery.`};
-  return {label:'Hold calories',body:`Your estimated trend is ${weeklyRate>0?'+':''}${round(weeklyRate,2)} lb/week. Keep the current target for another week unless performance, hunger, or recovery is deteriorating.`};
+function linearWeeklyRate(weights) {
+  if (weights.length < 2) return 0;
+  const start = new Date(`${weights[0].date}T12:00:00`).getTime();
+  const points = weights.map(entry => ({x:(new Date(`${entry.date}T12:00:00`).getTime() - start) / 86400000,y:entry.weight}));
+  const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+  const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+  const denominator = points.reduce((sum, point) => sum + (point.x - meanX) ** 2, 0);
+  if (!denominator) return 0;
+  const slope = points.reduce((sum, point) => sum + (point.x - meanX) * (point.y - meanY), 0) / denominator;
+  return slope * 7;
 }
 
-function diaryAdherence(daysBack=7) {
-  let usable=0;
-  for (let i=0;i<daysBack;i++) {
-    const d=localDateKey(new Date(Date.now()-i*86400000));
-    const totals=totalsFor(d);
-    if (totals.calories >= state.profile.calorieGoal*.6) usable++;
+function adaptiveRecommendation(weights) {
+  if (weights.length < 4) return {label:'Need data',body:'Log at least four morning weigh-ins and keep your food diary reasonably complete. No calorie adjustment will be suggested until the trend is meaningful.'};
+  const sorted = [...weights].sort((a, b) => a.date.localeCompare(b.date));
+  const recent = sorted.slice(-14);
+  const spanDays = (new Date(`${recent.at(-1).date}T12:00:00`) - new Date(`${recent[0].date}T12:00:00`)) / 86400000;
+  if (spanDays < 5) return {label:'Learning',body:'Your weigh-ins cover fewer than five days. Keep calories stable while the trend engine learns your normal fluctuations.'};
+  const weeklyRate = linearWeeklyRate(recent);
+  const desired = Number(state.profile.weeklyGoal);
+  const adherence = diaryAdherence(7);
+  const rateText = `${weeklyRate > 0 ? '+' : ''}${round(weeklyRate, 2)} lb/week`;
+  if (adherence < .6) return {label:'Hold calories',body:`Your estimated trend is ${rateText}, but fewer than 60% of recent days have usable nutrition logs. Keep the current target until the input data is more consistent.`};
+  if (Math.abs(weeklyRate - desired) <= .35) return {label:'On target',body:`Your estimated trend is ${rateText}, close to the ${desired} lb/week plan. Keep calories at ${state.profile.calorieGoal}.`};
+  if (desired < 0 && weeklyRate > desired + .35) return {label:'Review −100 kcal',body:`Your estimated trend is ${rateText}, slower than the ${desired} lb/week goal. A cautious option is reducing the daily target by about 100 calories, then reassessing after another week.`};
+  if (desired < 0 && weeklyRate < desired - .35) return {label:'Review +100 kcal',body:`Your estimated trend is ${rateText}, faster than the ${desired} lb/week goal. A cautious option is adding about 100 calories per day to improve sustainability and training recovery.`};
+  return {label:'Hold calories',body:`Your estimated trend is ${rateText}. Keep the current target for another week unless performance, hunger, or recovery is deteriorating.`};
+}
+
+function diaryAdherence(daysBack = 7) {
+  let usable = 0;
+  for (let index = 0; index < daysBack; index += 1) {
+    const date = new Date();
+    date.setDate(date.getDate() - index);
+    const totals = totalsFor(localDateKey(date));
+    if (totals.calories >= state.profile.calorieGoal * .6) usable += 1;
   }
-  return usable/daysBack;
+  return usable / daysBack;
 }
 
 function renderConsistency() {
-  const nodes=[];
-  for(let i=6;i>=0;i--){
-    const date=localDateKey(new Date(Date.now()-i*86400000));
-    const totals=totalsFor(date); const day=getDay(date);
-    const hitProtein=totals.protein>=state.profile.proteinGoal;
-    const logged=totals.calories>=state.profile.calorieGoal*.6;
-    const cls=hitProtein&&logged?'good':logged?'partial':'';
-    nodes.push(`<div class="day-dot ${cls}"><span title="${date}"></span><small>${new Date(`${date}T12:00:00`).toLocaleDateString(undefined,{weekday:'narrow'})}</small></div>`);
+  const nodes = [];
+  for (let index = 6; index >= 0; index -= 1) {
+    const dateValue = new Date();
+    dateValue.setDate(dateValue.getDate() - index);
+    const date = localDateKey(dateValue);
+    const totals = totalsFor(date);
+    const hitProtein = totals.protein >= state.profile.proteinGoal;
+    const logged = totals.calories >= state.profile.calorieGoal * .6;
+    const className = hitProtein && logged ? 'good' : logged ? 'partial' : '';
+    nodes.push(`<div class="day-dot ${className}"><span title="${date}"></span><small>${new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {weekday:'narrow'})}</small></div>`);
   }
-  $('#consistencyGrid').innerHTML=nodes.join('');
+  $('#consistencyGrid').innerHTML = nodes.join('');
 }
 
 function renderWeightChart(weights) {
-  const canvas=$('#weightChart'); const ctx=canvas.getContext('2d');
-  const ratio=window.devicePixelRatio||1; const cssWidth=canvas.clientWidth||700; const cssHeight=Math.min(320,cssWidth*.46);
-  canvas.width=cssWidth*ratio; canvas.height=cssHeight*ratio; ctx.scale(ratio,ratio); ctx.clearRect(0,0,cssWidth,cssHeight);
-  if(weights.length<2){ctx.fillStyle='#8a929e';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('Add more weigh-ins to see your trend',cssWidth/2,cssHeight/2);return;}
-  const values=weights.map(w=>w.weight); let min=Math.min(...values); let max=Math.max(...values); if(max-min<2){min-=1;max+=1;}
-  const pad={l:38,r:18,t:20,b:30}; const x=i=>pad.l+i*(cssWidth-pad.l-pad.r)/(weights.length-1); const y=v=>pad.t+(max-v)*(cssHeight-pad.t-pad.b)/(max-min);
-  ctx.strokeStyle='#e3e7eb';ctx.lineWidth=1;
-  for(let i=0;i<4;i++){const yy=pad.t+i*(cssHeight-pad.t-pad.b)/3;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(cssWidth-pad.r,yy);ctx.stroke();}
-  ctx.strokeStyle='#111827';ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();weights.forEach((w,i)=>i?ctx.lineTo(x(i),y(w.weight)):ctx.moveTo(x(i),y(w.weight)));ctx.stroke();
-  ctx.fillStyle='#75f0ae';weights.forEach((w,i)=>{ctx.beginPath();ctx.arc(x(i),y(w.weight),4,0,Math.PI*2);ctx.fill();});
-  ctx.fillStyle='#6b7280';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText(`${round(max,1)}`,2,pad.t+4);ctx.fillText(`${round(min,1)}`,2,cssHeight-pad.b+4);
-  ctx.textAlign='center';ctx.fillText(new Date(`${weights[0].date}T12:00:00`).toLocaleDateString(undefined,{month:'short',day:'numeric'}),x(0),cssHeight-8);ctx.fillText(new Date(`${weights.at(-1).date}T12:00:00`).toLocaleDateString(undefined,{month:'short',day:'numeric'}),x(weights.length-1),cssHeight-8);
+  const canvas = $('#weightChart');
+  const context = canvas?.getContext?.('2d');
+  if (!canvas || !context) return;
+  const ratio = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth || 700;
+  const cssHeight = Math.min(320, cssWidth * .46);
+  canvas.width = Math.max(1, Math.round(cssWidth * ratio));
+  canvas.height = Math.max(1, Math.round(cssHeight * ratio));
+  context.setTransform?.(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, cssWidth, cssHeight);
+  if (weights.length < 2) {
+    context.fillStyle = '#8a929e';
+    context.font = '14px sans-serif';
+    context.textAlign = 'center';
+    context.fillText('Add more weigh-ins to see your trend', cssWidth / 2, cssHeight / 2);
+    return;
+  }
+  const values = weights.map(entry => entry.weight);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (max - min < 2) { min -= 1; max += 1; }
+  const padding = {l:38,r:18,t:20,b:30};
+  const x = index => padding.l + index * (cssWidth - padding.l - padding.r) / (weights.length - 1);
+  const y = value => padding.t + (max - value) * (cssHeight - padding.t - padding.b) / (max - min);
+  context.strokeStyle = '#e3e7eb';
+  context.lineWidth = 1;
+  for (let index = 0; index < 4; index += 1) {
+    const yPosition = padding.t + index * (cssHeight - padding.t - padding.b) / 3;
+    context.beginPath();
+    context.moveTo(padding.l, yPosition);
+    context.lineTo(cssWidth - padding.r, yPosition);
+    context.stroke();
+  }
+  context.strokeStyle = '#111827';
+  context.lineWidth = 3;
+  context.lineJoin = 'round';
+  context.beginPath();
+  weights.forEach((entry, index) => index ? context.lineTo(x(index), y(entry.weight)) : context.moveTo(x(index), y(entry.weight)));
+  context.stroke();
+  context.fillStyle = '#75f0ae';
+  weights.forEach((entry, index) => {
+    context.beginPath();
+    context.arc(x(index), y(entry.weight), 4, 0, Math.PI * 2);
+    context.fill();
+  });
+  context.fillStyle = '#6b7280';
+  context.font = '11px sans-serif';
+  context.textAlign = 'left';
+  context.fillText(`${round(max, 1)}`, 2, padding.t + 4);
+  context.fillText(`${round(min, 1)}`, 2, cssHeight - padding.b + 4);
+  context.textAlign = 'center';
+  context.fillText(new Date(`${weights[0].date}T12:00:00`).toLocaleDateString(undefined, {month:'short',day:'numeric'}), x(0), cssHeight - 8);
+  context.fillText(new Date(`${weights.at(-1).date}T12:00:00`).toLocaleDateString(undefined, {month:'short',day:'numeric'}), x(weights.length - 1), cssHeight - 8);
 }
 
 function renderCoach() {
-  const totals=totalsFor(); const day=getDay(); const insight=coachInsight();
-  setText('coachMainTitle',insight.title); setText('coachMainBody',insight.body);
-  const feed=[];
-  const proteinDensity=totals.calories?round(totals.protein/totals.calories*100,1):0;
-  feed.push({title:'Protein density',body:totals.calories?`Today’s food provides ${proteinDensity} g of protein per 100 calories. For a high-protein cut, keeping this near 8–10 g can make the target easier.`:'Log food to calculate protein density.'});
-  feed.push({title:'Exercise calories',body:state.profile.eatBackExercise?`Exercise calories are currently added to your food budget. Today that changes the target by ${day.exerciseCalories} calories.`:'Exercise calories are not automatically added to your food budget, reducing the risk of double-counting wearable estimates.'});
-  feed.push({title:'Recovery check',body:day.sleep?`${day.sleep} hours of sleep logged. ${day.sleep>=7?'Recovery input is in a solid range.':'Consider lowering workout intensity if performance or coordination feels off.'}`:'No sleep entry yet. Logging it helps the coach distinguish nutrition problems from recovery problems.'});
-  $('#coachFeed').innerHTML=feed.map(x=>`<article class="coach-item"><h4>${x.title}</h4><p>${x.body}</p></article>`).join('');
-  const left=Math.max(0,state.profile.proteinGoal-totals.protein);
-  $('#proteinRescue').innerHTML=rescueFoods.map(f=>`<button class="rescue-item" data-rescue="${escapeHtml(f.name)}"><span><strong>${escapeHtml(f.name)}</strong><small>${f.calories} calories</small></span><strong>${f.protein}g</strong></button>`).join('') + (left?`<p class="fine-print">You have approximately ${round(left)} g remaining today.</p>`:'<p class="fine-print">Protein minimum reached.</p>');
+  const totals = totalsFor();
+  const day = getDay();
+  const insight = coachInsight();
+  setText('coachMainTitle', insight.title);
+  setText('coachMainBody', insight.body);
+  const proteinDensity = totals.calories ? round(totals.protein / totals.calories * 100, 1) : 0;
+  const feed = [
+    {title:'Protein density',body:totals.calories ? `Today’s food provides ${proteinDensity} g of protein per 100 calories. For a high-protein cut, keeping this near 8–10 g can make the target easier.` : 'Log food to calculate protein density.'},
+    {title:'Exercise calories',body:state.profile.eatBackExercise ? `Exercise calories are currently added to your food budget. Today that changes the target by ${day.exerciseCalories} calories.` : 'Exercise calories are not automatically added to your food budget, reducing the risk of double-counting wearable estimates.'},
+    {title:'Recovery check',body:day.sleep ? `${day.sleep} hours of sleep logged. ${day.sleep >= 7 ? 'Recovery input is in a solid range.' : 'Consider lowering workout intensity if performance or coordination feels off.'}` : 'No sleep entry yet. Logging it helps the coach distinguish nutrition problems from recovery problems.'}
+  ];
+  $('#coachFeed').innerHTML = feed.map(item => `<article class="coach-item"><h4>${escapeHtml(item.title)}</h4><p>${escapeHtml(item.body)}</p></article>`).join('');
+  const left = Math.max(0, state.profile.proteinGoal - totals.protein);
+  $('#proteinRescue').innerHTML = rescueFoods.map(food => `<button type="button" class="rescue-item" data-rescue-food="${food.foodId}"><span><strong>${escapeHtml(food.label)}</strong><small>${food.calories} calories</small></span><strong>${food.protein}g</strong></button>`).join('') + (left ? `<p class="fine-print">You have approximately ${round(left)} g remaining today.</p>` : '<p class="fine-print">Protein minimum reached.</p>');
 }
 
-function populateSettings(){
-  const form=$('#settingsForm'); if(!form)return;
-  Object.entries(state.profile).forEach(([key,val])=>{const input=form.elements[key];if(input){if(input.type==='checkbox')input.checked=Boolean(val);else input.value=val;}});
+function populateSettings() {
+  const form = $('#settingsForm');
+  if (!form) return;
+  Object.entries(state.profile).forEach(([key, value]) => {
+    const input = form.elements[key];
+    if (!input) return;
+    if (input.type === 'checkbox') input.checked = Boolean(value);
+    else input.value = value;
+  });
 }
 
-function navigate(view){
-  $$('.view').forEach(v=>v.classList.toggle('active',v.dataset.view===view));
-  $$('.bottom-nav button').forEach(b=>b.classList.toggle('active',b.dataset.viewTarget===view));
-  window.scrollTo({top:0,behavior:'smooth'}); $('#app').focus({preventScroll:true});
-  if(view==='progress')setTimeout(()=>renderProgress(),30);
+function navigate(view) {
+  if (!VALID_VIEWS.has(view)) return;
+  $$('.view').forEach(element => element.classList.toggle('active', element.dataset.view === view));
+  $$('.bottom-nav button').forEach(button => button.classList.toggle('active', button.dataset.viewTarget === view));
+  window.scrollTo?.({top:0,behavior:'smooth'});
+  $('#app')?.focus({preventScroll:true});
+  if (view === 'progress') setTimeout(renderProgress, 30);
 }
 
-function openModal(type, options={}){
-  const content=$('#modalContent');
-  const configs={
+function stopBarcodeCamera() {
+  activeMediaStream?.getTracks?.().forEach(track => track.stop());
+  activeMediaStream = null;
+  const video = $('#barcodeVideo');
+  if (video) {
+    video.pause?.();
+    video.srcObject = null;
+    video.hidden = true;
+  }
+}
+
+function openModal(type, options = {}) {
+  const content = $('#modalContent');
+  const configurations = {
     food:['Nutrition','Add food'],barcode:['Fast logging','Barcode lookup'],workout:['Training','Log workout'],weight:['Progress','Log weight'],water:['Hydration','Add water'],habits:['Daily inputs','Steps and sleep'],date:['Diary date','Choose a day']
   };
-  const [eyebrow,title]=configs[type]||['','Log']; setText('modalEyebrow',eyebrow);setText('modalTitle',title);
-  if(type==='food') content.innerHTML=foodModal(options.meal||'Breakfast');
-  if(type==='barcode') content.innerHTML=barcodeModal();
-  if(type==='workout') content.innerHTML=workoutModal();
-  if(type==='weight') content.innerHTML=weightModal();
-  if(type==='water') content.innerHTML=waterModal();
-  if(type==='habits') content.innerHTML=habitsModal();
-  if(type==='date') content.innerHTML=dateModal();
-  modal.showModal();
-  if(type==='food'){const input=$('#foodSearch');input?.focus();renderFoodResults('');}
+  if (!configurations[type]) return;
+  stopBarcodeCamera();
+  modalContext = {meal:MEALS.includes(options.meal) ? options.meal : 'Breakfast'};
+  const [eyebrow, title] = configurations[type];
+  setText('modalEyebrow', eyebrow);
+  setText('modalTitle', title);
+  if (type === 'food') content.innerHTML = foodModal(modalContext.meal);
+  if (type === 'barcode') content.innerHTML = barcodeModal(modalContext.meal);
+  if (type === 'workout') content.innerHTML = workoutModal();
+  if (type === 'weight') content.innerHTML = weightModal();
+  if (type === 'water') content.innerHTML = waterModal();
+  if (type === 'habits') content.innerHTML = habitsModal();
+  if (type === 'date') content.innerHTML = dateModal();
+  if (!modal.open) modal.showModal();
+  if (type === 'food') {
+    $('#foodSearch')?.focus();
+    renderFoodResults('');
+  }
 }
 
-function foodModal(meal){return `<div class="modal-form"><label>Meal<select id="foodMeal">${MEALS.map(m=>`<option ${m===meal?'selected':''}>${m}</option>`).join('')}</select></label><label>Search<input id="foodSearch" type="search" placeholder="Chicken, rice, protein shake…" autocomplete="off"></label><div class="inline-actions"><button type="button" class="secondary-button" id="createFoodButton">Create custom food</button></div><div id="foodResults" class="search-results"></div></div>`;}
-function barcodeModal(){return `<div class="modal-form"><p class="form-note">Enter a UPC/EAN code. Known barcodes work offline. For an unknown product, create its nutrition record once and PhactoryFit will remember it on this device. Camera detection depends on browser support.</p><label>Barcode<input id="barcodeInput" inputmode="numeric" placeholder="e.g. 049000050103"></label><div class="inline-actions"><button type="button" class="primary-button" id="lookupBarcode">Look up</button><button type="button" class="secondary-button" id="cameraBarcode">Use camera</button></div><video id="barcodeVideo" playsinline hidden style="width:100%;border-radius:14px"></video><div id="barcodeResult"></div></div>`;}
-function workoutModal(){return `<form id="workoutForm" class="modal-form"><label>Workout name<input name="name" value="Strength training" required></label><div class="two-col"><label>Minutes<input name="minutes" type="number" min="1" value="45" required></label><label>Estimated calories<input name="calories" type="number" min="0" value="250"></label></div><label>Notes<input name="notes" placeholder="Upper body, run, cycling…"></label><button class="primary-button" type="submit">Save workout</button></form>`;}
-function weightModal(){const latest=[...state.weights].sort((a,b)=>a.date.localeCompare(b.date)).at(-1)?.weight||state.profile.currentWeight;return `<form id="weightForm" class="modal-form"><label>Date<input name="date" type="date" value="${state.selectedDate}" required></label><label>Weight (lb)<input name="weight" type="number" step="0.1" value="${latest}" required></label><button class="primary-button" type="submit">Save weigh-in</button></form>`;}
-function waterModal(){return `<form id="waterForm" class="modal-form"><label>Cups to add<input name="cups" type="number" step="1" min="-20" value="1" required></label><button class="primary-button" type="submit">Update water</button></form>`;}
-function habitsModal(){const d=getDay();return `<form id="habitsForm" class="modal-form"><label>Steps<input name="steps" type="number" min="0" value="${d.steps}" required></label><label>Sleep (hours)<input name="sleep" type="number" min="0" max="24" step="0.25" value="${d.sleep}" required></label><button class="primary-button" type="submit">Save habits</button></form>`;}
-function dateModal(){return `<form id="dateForm" class="modal-form"><label>Date<input name="date" type="date" value="${state.selectedDate}" required></label><button class="primary-button" type="submit">Open day</button></form>`;}
-
-function renderFoodResults(query){
-  const target=$('#foodResults');if(!target)return;
-  const q=query.trim().toLowerCase();
-  let foods=allFoods().filter(f=>!q||f.name.toLowerCase().includes(q)||f.brand.toLowerCase().includes(q)||(f.aliases||[]).some(a=>a.includes(q)));
-  const recentMap=new Map(state.recentFoodIds.map((id,i)=>[id,i]));
-  foods.sort((a,b)=>(recentMap.get(a.id)??999)-(recentMap.get(b.id)??999));
-  target.innerHTML=foods.slice(0,30).map(f=>`<button type="button" class="search-result" data-food-id="${escapeHtml(f.id)}"><strong>${escapeHtml(f.name)}</strong><small>${escapeHtml(f.brand)} · ${escapeHtml(f.serving)} · ${round(f.calories)} kcal · ${round(f.protein,1)}g protein</small></button>`).join('')||'<p class="form-note">No match. Create a custom food.</p>';
+function mealOptions(selected) {
+  return MEALS.map(meal => `<option ${meal === selected ? 'selected' : ''}>${meal}</option>`).join('');
 }
 
-function showFoodQuantity(food){
-  $('#modalContent').innerHTML=`<form id="addFoodForm" class="modal-form"><div class="search-result"><strong>${escapeHtml(food.name)}</strong><small>${escapeHtml(food.serving)} · ${round(food.calories)} kcal · ${round(food.protein,1)}g protein</small></div><label>Meal<select name="meal">${MEALS.map(m=>`<option ${m===($('#foodMeal')?.value||'Breakfast')?'selected':''}>${m}</option>`).join('')}</select></label><label>Number of servings<input name="quantity" type="number" step="0.25" min="0.25" value="1" required></label><input name="foodId" type="hidden" value="${escapeHtml(food.id)}"><button class="primary-button" type="submit">Add to diary</button></form>`;
+function foodModal(meal) {
+  return `<div class="modal-form"><label>Meal<select id="foodMeal">${mealOptions(meal)}</select></label><label>Search<input id="foodSearch" type="search" placeholder="Chicken, rice, protein shake…" autocomplete="off"></label><div class="inline-actions"><button type="button" class="secondary-button" id="createFoodButton">Create custom food</button></div><div id="foodResults" class="search-results"></div></div>`;
 }
 
-function showCustomFoodForm(barcode=''){
-  $('#modalContent').innerHTML=`<form id="customFoodForm" class="modal-form">${barcode?`<p class="form-note">This food will be linked to barcode ${escapeHtml(barcode)} for future scans.</p>`:''}<input name="barcode" type="hidden" value="${escapeHtml(barcode)}"><label>Food name<input name="name" required></label><label>Brand<input name="brand" value="Custom"></label><label>Serving description<input name="serving" placeholder="1 serving, 100 g, 1 cup" required></label><div class="two-col"><label>Calories<input name="calories" type="number" step="0.1" min="0" required></label><label>Protein (g)<input name="protein" type="number" step="0.1" min="0" required></label></div><div class="two-col"><label>Carbs (g)<input name="carbs" type="number" step="0.1" min="0" value="0" required></label><label>Fat (g)<input name="fat" type="number" step="0.1" min="0" value="0" required></label></div><div class="two-col"><label>Fiber (g)<input name="fiber" type="number" step="0.1" min="0" value="0"></label><label>Sodium (mg)<input name="sodium" type="number" step="0.1" min="0" value="0"></label></div><button class="primary-button" type="submit">Save food</button></form>`;
+function barcodeModal(meal) {
+  return `<div class="modal-form"><p class="form-note">Enter a UPC/EAN code. Known barcodes work offline. For an unknown product, create its nutrition record once and PhactoryFit will remember it on this device. Camera detection depends on browser support.</p><label>Meal<select id="barcodeMeal">${mealOptions(meal)}</select></label><label>Barcode<input id="barcodeInput" inputmode="numeric" autocomplete="off" placeholder="e.g. 049000050103"></label><div class="inline-actions"><button type="button" class="primary-button" id="lookupBarcode">Look up</button><button type="button" class="secondary-button" id="cameraBarcode">Use camera</button></div><video id="barcodeVideo" playsinline hidden style="width:100%;border-radius:14px"></video><div id="barcodeResult"></div></div>`;
 }
 
-async function lookupBarcode(code){
-  const result=$('#barcodeResult');
-  if(!/^\d{8,14}$/.test(code)){result.innerHTML='<p class="form-note">Enter a valid 8–14 digit barcode.</p>';return;}
-  const localFood=allFoods().find(food=>String(food.barcode||'')===code);
-  if(localFood){
-    result.innerHTML=`<div class="search-result"><strong>${escapeHtml(localFood.name)}</strong><small>${escapeHtml(localFood.brand)} · ${escapeHtml(localFood.serving)} · ${round(localFood.calories)} kcal · ${round(localFood.protein,1)}g protein</small></div><button type="button" id="addBarcodeFood" class="primary-button">Add product</button>`;
-    $('#addBarcodeFood').onclick=()=>showFoodQuantity(localFood);
+function workoutModal() {
+  return `<form id="workoutForm" class="modal-form"><label>Workout name<input name="name" value="Strength training" maxlength="200" required></label><div class="two-col"><label>Minutes<input name="minutes" type="number" min="1" max="1440" value="45" required></label><label>Estimated calories<input name="calories" type="number" min="0" max="20000" value="250"></label></div><label>Notes<input name="notes" maxlength="2000" placeholder="Upper body, run, cycling…"></label><button class="primary-button" type="submit">Save workout</button></form>`;
+}
+
+function weightModal() {
+  const latest = latestWeight()?.weight || state.profile.currentWeight;
+  return `<form id="weightForm" class="modal-form"><label>Date<input name="date" type="date" max="${localDateKey()}" value="${state.selectedDate > localDateKey() ? localDateKey() : state.selectedDate}" required></label><label>Weight (lb)<input name="weight" type="number" min="40" max="1500" step="0.1" value="${latest}" required></label><button class="primary-button" type="submit">Save weigh-in</button></form>`;
+}
+
+function waterModal() {
+  return `<form id="waterForm" class="modal-form"><label>Cups to add or remove<input name="cups" type="number" step="0.5" min="-20" max="100" value="1" required></label><button class="primary-button" type="submit">Update water</button></form>`;
+}
+
+function habitsModal() {
+  const day = getDay();
+  return `<form id="habitsForm" class="modal-form"><label>Steps<input name="steps" type="number" min="0" max="1000000" value="${day.steps}" required></label><label>Sleep (hours)<input name="sleep" type="number" min="0" max="24" step="0.25" value="${day.sleep}" required></label><button class="primary-button" type="submit">Save habits</button></form>`;
+}
+
+function dateModal() {
+  return `<form id="dateForm" class="modal-form"><label>Date<input name="date" type="date" value="${state.selectedDate}" required></label><button class="primary-button" type="submit">Open day</button></form>`;
+}
+
+function renderFoodResults(query) {
+  const target = $('#foodResults');
+  if (!target) return;
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  const recentMap = new Map(state.recentFoodIds.map((id, index) => [id, index]));
+  const foods = allFoods().filter(food => {
+    const name = String(food.name || '').toLowerCase();
+    const brand = String(food.brand || '').toLowerCase();
+    return !normalizedQuery || name.includes(normalizedQuery) || brand.includes(normalizedQuery) || (food.aliases || []).some(alias => String(alias).toLowerCase().includes(normalizedQuery));
+  });
+  foods.sort((first, second) => (recentMap.get(first.id) ?? 999) - (recentMap.get(second.id) ?? 999) || first.name.localeCompare(second.name));
+  target.innerHTML = foods.slice(0, 30).map(food => `<button type="button" class="search-result" data-food-id="${escapeHtml(food.id)}"><strong>${escapeHtml(food.name)}</strong><small>${escapeHtml(food.brand)} · ${escapeHtml(food.serving)} · ${round(food.calories)} kcal · ${round(food.protein, 1)}g protein</small></button>`).join('') || '<p class="form-note">No match. Create a custom food.</p>';
+}
+
+function showFoodQuantity(food, meal = modalContext.meal) {
+  const selectedMeal = MEALS.includes(meal) ? meal : 'Breakfast';
+  modalContext.meal = selectedMeal;
+  $('#modalContent').innerHTML = `<form id="addFoodForm" class="modal-form"><div class="search-result"><strong>${escapeHtml(food.name)}</strong><small>${escapeHtml(food.serving)} · ${round(food.calories)} kcal · ${round(food.protein, 1)}g protein</small></div><label>Meal<select name="meal">${mealOptions(selectedMeal)}</select></label><label>Number of servings<input name="quantity" type="number" step="0.01" min="0.01" max="1000" value="1" required></label><input name="foodId" type="hidden" value="${escapeHtml(food.id)}"><button class="primary-button" type="submit">Add to diary</button></form>`;
+}
+
+function showCustomFoodForm(barcode = '', meal = modalContext.meal) {
+  const selectedMeal = MEALS.includes(meal) ? meal : 'Breakfast';
+  modalContext.meal = selectedMeal;
+  $('#modalContent').innerHTML = `<form id="customFoodForm" class="modal-form">${barcode ? `<p class="form-note">This food will be linked to barcode ${escapeHtml(barcode)} for future scans.</p>` : ''}<input name="barcode" type="hidden" value="${escapeHtml(barcode)}"><input name="meal" type="hidden" value="${selectedMeal}"><label>Food name<input name="name" maxlength="200" required></label><label>Brand<input name="brand" maxlength="200" value="Custom"></label><label>Serving description<input name="serving" maxlength="200" placeholder="1 serving, 100 g, 1 cup" required></label><div class="two-col"><label>Calories<input name="calories" type="number" step="0.1" min="0" max="100000" required></label><label>Protein (g)<input name="protein" type="number" step="0.1" min="0" max="10000" required></label></div><div class="two-col"><label>Carbs (g)<input name="carbs" type="number" step="0.1" min="0" max="10000" value="0" required></label><label>Fat (g)<input name="fat" type="number" step="0.1" min="0" max="10000" value="0" required></label></div><div class="two-col"><label>Fiber (g)<input name="fiber" type="number" step="0.1" min="0" max="10000" value="0"></label><label>Sodium (mg)<input name="sodium" type="number" step="0.1" min="0" max="1000000" value="0"></label></div><button class="primary-button" type="submit">Save food</button></form>`;
+}
+
+function servingFactor(servingText) {
+  const match = String(servingText || '').match(/(\d+(?:\.\d+)?)\s*(g|ml)\b/i);
+  return match ? Number(match[1]) / 100 : 1;
+}
+
+function productNutrient(product, nutrientNames, factor = 1) {
+  const nutrition = product.nutriments || product.nutrition || {};
+  for (const name of nutrientNames) {
+    const directCandidates = [product[name], nutrition[name], nutrition[`${name}_serving`]];
+    for (const candidate of directCandidates) {
+      const number = Number(candidate);
+      if (Number.isFinite(number)) return number;
+    }
+  }
+  for (const name of nutrientNames) {
+    const number = Number(nutrition[`${name}_100g`]);
+    if (Number.isFinite(number)) return number * factor;
+  }
+  return 0;
+}
+
+async function fetchWithTimeout(url, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {signal:controller.signal,headers:{Accept:'application/json'}});
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function lookupBarcode(code) {
+  const result = $('#barcodeResult');
+  const normalizedCode = String(code || '').replace(/\D/g, '');
+  if (!/^\d{8,14}$/.test(normalizedCode)) {
+    result.innerHTML = '<p class="form-note">Enter a valid 8–14 digit barcode.</p>';
     return;
   }
-  const proxy=window.PHACTORYFIT_CONFIG?.offProxyUrl?.trim();
-  if(proxy){
-    result.innerHTML='<p class="form-note">Looking up product…</p>';
-    try{
-      const response=await fetch(`${proxy}${proxy.includes('?')?'&':'?'}barcode=${encodeURIComponent(code)}`);
-      if(!response.ok)throw new Error(`HTTP ${response.status}`);
-      const data=await response.json();
-      const p=data.product||data;
-      if(!p||(!p.product_name&&!p.name))throw new Error('Product not found');
-      const n=p.nutriments||p.nutrition||{};
-      const servingText=p.serving_size||p.serving||'100 g';
-      const grams=parseFloat(servingText); const factor=Number.isFinite(grams)&&grams>0?grams/100:1;
-      const nutrient=(normalized,offKey)=>Number(p[normalized]??n[normalized]??((Number(n[`${offKey}_100g`])||0)*factor))||0;
-      const food={id:`off-${code}`,name:p.product_name||p.name,brand:p.brands||p.brand||'Open Food Facts',serving:servingText,calories:round(nutrient('calories','energy-kcal'),1),protein:round(nutrient('protein','proteins'),1),carbs:round(nutrient('carbs','carbohydrates'),1),fat:round(nutrient('fat','fat'),1),fiber:round(nutrient('fiber','fiber'),1),sugar:round(nutrient('sugar','sugars'),1),sodium:round(Number(p.sodium??n.sodium??((Number(n.sodium_100g)||0)*1000*factor))||0,1),aliases:[],source:'Open Food Facts',barcode:code};
-      if(!state.customFoods.some(x=>x.id===food.id))state.customFoods.push(food);
-      saveState();
-      result.innerHTML=`<div class="search-result"><strong>${escapeHtml(food.name)}</strong><small>${escapeHtml(food.brand)} · ${escapeHtml(food.serving)} · ${food.calories} kcal · ${food.protein}g protein</small></div><button type="button" id="addBarcodeFood" class="primary-button">Add product</button>`;
-      $('#addBarcodeFood').onclick=()=>showFoodQuantity(food);
-      return;
-    }catch(error){console.error(error);}
+  const selectedMeal = MEALS.includes($('#barcodeMeal')?.value) ? $('#barcodeMeal').value : modalContext.meal;
+  modalContext.meal = selectedMeal;
+  const localFood = allFoods().find(food => String(food.barcode || '') === normalizedCode);
+  if (localFood) {
+    result.innerHTML = `<div class="search-result"><strong>${escapeHtml(localFood.name)}</strong><small>${escapeHtml(localFood.brand)} · ${escapeHtml(localFood.serving)} · ${round(localFood.calories)} kcal · ${round(localFood.protein, 1)}g protein</small></div><button type="button" id="addBarcodeFood" class="primary-button">Add product</button>`;
+    $('#addBarcodeFood').onclick = () => showFoodQuantity(localFood, selectedMeal);
+    return;
   }
-  result.innerHTML=`<p class="form-note">This barcode is not in your local library yet.</p><button type="button" id="teachBarcodeFood" class="primary-button">Create and remember food</button>`;
-  $('#teachBarcodeFood').onclick=()=>showCustomFoodForm(code);
+
+  const proxy = window.PHACTORYFIT_CONFIG?.offProxyUrl?.trim();
+  if (proxy) {
+    result.innerHTML = '<p class="form-note">Looking up product…</p>';
+    try {
+      const response = await fetchWithTimeout(`${proxy}${proxy.includes('?') ? '&' : '?'}barcode=${encodeURIComponent(normalizedCode)}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const product = data.product || data;
+      if (!product || (!product.product_name && !product.name)) throw new Error('Product not found');
+      const serving = product.serving_size || product.serving || '100 g';
+      const factor = servingFactor(serving);
+      const sodiumGrams = productNutrient(product, ['sodium'], factor);
+      const normalizedFood = normalizeFood({
+        id:`off-${normalizedCode}`,
+        name:product.product_name || product.name,
+        brand:product.brands || product.brand || 'Open Food Facts',
+        serving,
+        calories:productNutrient(product, ['calories','energy-kcal'], factor),
+        protein:productNutrient(product, ['protein','proteins'], factor),
+        carbs:productNutrient(product, ['carbs','carbohydrates'], factor),
+        fat:productNutrient(product, ['fat'], factor),
+        fiber:productNutrient(product, ['fiber'], factor),
+        sugar:productNutrient(product, ['sugar','sugars'], factor),
+        sodium:Number(product.sodium_mg ?? product.nutriments?.sodium_mg_serving ?? sodiumGrams * 1000),
+        aliases:[],source:'Open Food Facts',barcode:normalizedCode
+      }, `off-${normalizedCode}`);
+      if (!normalizedFood) throw new Error('Invalid product data');
+      const existingIndex = state.customFoods.findIndex(food => food.id === normalizedFood.id);
+      if (existingIndex >= 0) state.customFoods[existingIndex] = normalizedFood;
+      else state.customFoods.push(normalizedFood);
+      saveState();
+      result.innerHTML = `<div class="search-result"><strong>${escapeHtml(normalizedFood.name)}</strong><small>${escapeHtml(normalizedFood.brand)} · ${escapeHtml(normalizedFood.serving)} · ${round(normalizedFood.calories)} kcal · ${round(normalizedFood.protein, 1)}g protein</small></div><button type="button" id="addBarcodeFood" class="primary-button">Add product</button>`;
+      $('#addBarcodeFood').onclick = () => showFoodQuantity(normalizedFood, selectedMeal);
+      return;
+    } catch (error) {
+      console.warn('Barcode lookup failed', error);
+    }
+  }
+
+  result.innerHTML = '<p class="form-note">This barcode is not in your local library yet.</p><button type="button" id="teachBarcodeFood" class="primary-button">Create and remember food</button>';
+  $('#teachBarcodeFood').onclick = () => showCustomFoodForm(normalizedCode, selectedMeal);
 }
-async function startBarcodeCamera(){
-  const result=$('#barcodeResult');
-  if(!('BarcodeDetector' in window)||!navigator.mediaDevices?.getUserMedia){result.innerHTML='<p class="form-note">Camera barcode detection is not supported by this browser. Enter the barcode number printed below the package barcode.</p>';return;}
-  let stream;
-  try{
-    const detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
-    const video=$('#barcodeVideo');video.hidden=false;video.srcObject=stream;await video.play();
-    result.innerHTML='<p class="form-note">Point the camera at the barcode.</p>';
-    const started=Date.now();
-    while(Date.now()-started<20000&&modal.open){
-      const codes=await detector.detect(video); if(codes.length){const code=codes[0].rawValue;$('#barcodeInput').value=code;stream.getTracks().forEach(t=>t.stop());video.hidden=true;await lookupBarcode(code);return;}
-      await new Promise(r=>setTimeout(r,250));
+
+async function startBarcodeCamera() {
+  const result = $('#barcodeResult');
+  if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
+    result.innerHTML = '<p class="form-note">Camera barcode detection is not supported by this browser. Enter the barcode number printed below the package barcode.</p>';
+    return;
+  }
+  stopBarcodeCamera();
+  try {
+    const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
+    activeMediaStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+    const video = $('#barcodeVideo');
+    video.hidden = false;
+    video.srcObject = activeMediaStream;
+    await video.play();
+    result.innerHTML = '<p class="form-note">Point the camera at the barcode.</p>';
+    const started = Date.now();
+    while (Date.now() - started < 20000 && modal.open && activeMediaStream) {
+      const codes = await detector.detect(video);
+      if (codes.length) {
+        const code = codes[0].rawValue;
+        $('#barcodeInput').value = code;
+        stopBarcodeCamera();
+        await lookupBarcode(code);
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 250));
     }
     throw new Error('No barcode detected');
-  }catch(error){console.error(error);stream?.getTracks().forEach(t=>t.stop());result.innerHTML='<p class="form-note">The camera could not read the barcode. Enter the printed digits manually.</p>';}
+  } catch (error) {
+    console.warn('Camera barcode scan failed', error);
+    stopBarcodeCamera();
+    if ($('#barcodeResult')) $('#barcodeResult').innerHTML = '<p class="form-note">The camera could not read the barcode. Enter the printed digits manually.</p>';
+  }
 }
 
-function startVoiceLog(){
-  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!Recognition){toast('Voice recognition is not supported in this browser.');return;}
-  const recognition=new Recognition();recognition.lang='en-US';recognition.interimResults=false;recognition.maxAlternatives=1;
-  $('#voiceLogButton').textContent='Listening…';
-  recognition.onresult=e=>{const text=e.results[0][0].transcript;openModal('food');setTimeout(()=>{$('#foodSearch').value=text;renderFoodResults(text);toast(`Heard: ${text}`);},50);};
-  recognition.onerror=()=>toast('Voice logging could not start.');recognition.onend=()=>$('#voiceLogButton').textContent='🎙 Voice log';recognition.start();
+function startVoiceLog() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) {
+    toast('Voice recognition is not supported in this browser.');
+    return;
+  }
+  const recognition = new Recognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  $('#voiceLogButton').textContent = 'Listening…';
+  recognition.onresult = event => {
+    const text = event.results[0][0].transcript;
+    openModal('food');
+    setTimeout(() => {
+      if ($('#foodSearch')) {
+        $('#foodSearch').value = text;
+        renderFoodResults(text);
+        toast(`Heard: ${text}`);
+      }
+    }, 50);
+  };
+  recognition.onerror = () => toast('Voice logging could not start.');
+  recognition.onend = () => { if ($('#voiceLogButton')) $('#voiceLogButton').textContent = '🎙 Voice log'; };
+  try {
+    recognition.start();
+  } catch (error) {
+    console.warn('Voice recognition failed to start', error);
+    recognition.onend();
+    toast('Voice logging could not start.');
+  }
 }
 
-function parseSuggestedQuantity(text){const m=text.match(/\b(\d+(?:\.\d+)?)\b/);return m?Number(m[1]):1;}
-
-function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2600);}
-
-function exportData(){
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`phactoryfit-backup-${localDateKey()}.json`;a.click();URL.revokeObjectURL(url);toast('Backup exported.');
+function toast(message) {
+  const element = $('#toast');
+  if (!element) return;
+  element.textContent = message;
+  element.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => element.classList.remove('show'), 2600);
 }
 
-async function importData(file){
-  try{const parsed=JSON.parse(await file.text());if(!parsed.profile||!parsed.days)throw new Error('Invalid backup');state={...defaultState(),...parsed,profile:{...defaultState().profile,...parsed.profile}};saveState();render();toast('Backup imported.');}catch(error){console.error(error);toast('That file is not a valid PhactoryFit backup.');}
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `phactoryfit-backup-${localDateKey()}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('Backup exported.');
 }
 
-function registerServiceWorker(){if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js').catch(err=>console.warn('Service worker unavailable',err));}
+async function importData(file) {
+  try {
+    if (!file || file.size > 20 * 1024 * 1024) throw new Error('Backup is missing or too large');
+    const parsed = JSON.parse(await file.text());
+    if (!parsed || typeof parsed !== 'object' || !parsed.profile || !parsed.days) throw new Error('Invalid backup');
+    state = normalizeState(parsed);
+    saveState();
+    render();
+    toast('Backup imported.');
+  } catch (error) {
+    console.error('Backup import failed', error);
+    toast('That file is not a valid PhactoryFit backup.');
+  } finally {
+    if ($('#importInput')) $('#importInput').value = '';
+  }
+}
 
-// Navigation and global interactions
-document.addEventListener('click', event=>{
-  const nav=event.target.closest('[data-view-target]'); if(nav){navigate(nav.dataset.viewTarget);return;}
-  const link=event.target.closest('[data-nav]'); if(link){navigate(link.dataset.nav);return;}
-  const modalButton=event.target.closest('[data-modal]'); if(modalButton){openModal(modalButton.dataset.modal);return;}
-  const mealButton=event.target.closest('[data-add-meal]'); if(mealButton){openModal('food',{meal:mealButton.dataset.addMeal});return;}
-  const remove=event.target.closest('[data-remove-food]'); if(remove){getDay().foods=getDay().foods.filter(f=>f.logId!==remove.dataset.removeFood);render();toast('Food removed.');return;}
-  const foodChoice=event.target.closest('[data-food-id]'); if(foodChoice){const food=allFoods().find(f=>f.id===foodChoice.dataset.foodId);if(food)showFoodQuantity(food);return;}
-  const coachAction=event.target.closest('[data-coach-action]'); if(coachAction){const a=coachAction.dataset.coachAction;if(a.includes('protein'))navigate('coach');else if(a.includes('Review'))navigate('diary');else openModal(a.includes('barcode')?'barcode':'food');return;}
-  const rescue=event.target.closest('[data-rescue]'); if(rescue){const food=allFoods().find(f=>f.name.toLowerCase().includes(rescue.dataset.rescue.toLowerCase().split(' ')[0]))||allFoods().find(f=>rescue.dataset.rescue.toLowerCase().includes(f.name.toLowerCase().split(',')[0]));if(food){openModal('food');setTimeout(()=>showFoodQuantity(food),20);}return;}
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('./service-worker.js').then(registration => registration.update()).catch(error => console.warn('Service worker unavailable', error));
+}
+
+function selectedMealFromCurrentModal() {
+  const value = $('#foodMeal')?.value || $('#barcodeMeal')?.value || modalContext.meal;
+  return MEALS.includes(value) ? value : 'Breakfast';
+}
+
+const coachActionHandlers = {
+  'Log breakfast':() => openModal('food', {meal:'Breakfast'}),
+  'Scan a barcode':() => openModal('barcode'),
+  'Open protein rescue':() => navigate('coach'),
+  'Log food':() => openModal('food'),
+  'Review diary':() => navigate('diary'),
+  'Update sleep':() => openModal('habits')
+};
+
+document.addEventListener('click', event => {
+  const navigation = event.target.closest('[data-view-target]');
+  if (navigation) { navigate(navigation.dataset.viewTarget); return; }
+  const link = event.target.closest('[data-nav]');
+  if (link) { navigate(link.dataset.nav); return; }
+  const modalButton = event.target.closest('[data-modal]');
+  if (modalButton) { openModal(modalButton.dataset.modal); return; }
+  const mealButton = event.target.closest('[data-add-meal]');
+  if (mealButton) { openModal('food', {meal:mealButton.dataset.addMeal}); return; }
+  const remove = event.target.closest('[data-remove-food]');
+  if (remove) {
+    getDay().foods = getDay().foods.filter(food => food.logId !== remove.dataset.removeFood);
+    render();
+    toast('Food removed.');
+    return;
+  }
+  const foodChoice = event.target.closest('[data-food-id]');
+  if (foodChoice) {
+    const food = allFoods().find(item => item.id === foodChoice.dataset.foodId);
+    if (food) showFoodQuantity(food, selectedMealFromCurrentModal());
+    return;
+  }
+  const coachAction = event.target.closest('[data-coach-action]');
+  if (coachAction) {
+    coachActionHandlers[coachAction.dataset.coachAction]?.();
+    return;
+  }
+  const rescue = event.target.closest('[data-rescue-food]');
+  if (rescue) {
+    const food = allFoods().find(item => item.id === rescue.dataset.rescueFood);
+    if (food) {
+      openModal('food');
+      showFoodQuantity(food, 'Snacks');
+    }
+  }
 });
 
-document.addEventListener('input', event=>{if(event.target.id==='foodSearch')renderFoodResults(event.target.value);});
-
-document.addEventListener('submit', event=>{
-  event.preventDefault(); const form=event.target; const data=Object.fromEntries(new FormData(form));
-  if(form.id==='addFoodForm'){
-    const food=allFoods().find(f=>f.id===data.foodId);if(!food)return;
-    const quantity=Number(data.quantity)||1;getDay().foods.push({...food,meal:data.meal,quantity,logId:crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`});state.recentFoodIds=[food.id,...state.recentFoodIds.filter(id=>id!==food.id)].slice(0,12);modal.close();render();toast(`${food.name} added.`);
-  }
-  if(form.id==='customFoodForm'){
-    const food={id:`custom-${Date.now()}`,name:data.name.trim(),brand:data.brand.trim()||'Custom',serving:data.serving.trim(),calories:Number(data.calories),protein:Number(data.protein),carbs:Number(data.carbs),fat:Number(data.fat),fiber:Number(data.fiber)||0,sugar:0,sodium:Number(data.sodium)||0,aliases:[],barcode:data.barcode||null};state.customFoods.push(food);showFoodQuantity(food);saveState();
-  }
-  if(form.id==='workoutForm'){
-    const day=getDay();day.workoutMinutes+=Number(data.minutes)||0;day.exerciseCalories+=Number(data.calories)||0;day.workoutName=data.name;day.workoutNotes=data.notes;modal.close();render();toast('Workout logged.');
-  }
-  if(form.id==='weightForm'){
-    const value=Number(data.weight);state.weights=state.weights.filter(w=>w.date!==data.date);state.weights.push({date:data.date,weight:value});state.profile.currentWeight=value;modal.close();render();toast('Weight saved.');
-  }
-  if(form.id==='waterForm'){getDay().water=Math.max(0,getDay().water+(Number(data.cups)||0));modal.close();render();toast('Water updated.');}
-  if(form.id==='habitsForm'){getDay().steps=Number(data.steps)||0;getDay().sleep=Number(data.sleep)||0;modal.close();render();toast('Habits saved.');}
-  if(form.id==='dateForm'){state.selectedDate=data.date;getDay();modal.close();render();}
+document.addEventListener('input', event => {
+  if (event.target.id === 'foodSearch') renderFoodResults(event.target.value);
 });
 
-$('#settingsForm').addEventListener('submit',event=>{event.preventDefault();const form=event.target;const data=Object.fromEntries(new FormData(form));state.profile={...state.profile,name:data.name.trim(),currentWeight:Number(data.currentWeight),goalWeight:Number(data.goalWeight),calorieGoal:Number(data.calorieGoal),proteinGoal:Number(data.proteinGoal),carbGoal:Number(data.carbGoal),fatGoal:Number(data.fatGoal),weeklyGoal:Number(data.weeklyGoal),eatBackExercise:form.elements.eatBackExercise.checked};saveState();render();toast('Goals saved.');});
+document.addEventListener('submit', event => {
+  event.preventDefault();
+  const form = event.target;
+  const data = Object.fromEntries(new FormData(form));
 
-$('#modalClose').addEventListener('click',()=>modal.close());
-$('#dateButton').addEventListener('click',()=>openModal('date'));
-$('#addFoodFab').addEventListener('click',()=>openModal('food'));
-$('#voiceLogButton').addEventListener('click',startVoiceLog);
-$('#waterHabit').addEventListener('click',()=>{getDay().water+=1;render();toast('Added 1 cup of water.');});
-$('#stepsHabit').addEventListener('click',()=>openModal('habits'));
-$('#workoutHabit').addEventListener('click',()=>openModal('workout'));
-$('#sleepHabit').addEventListener('click',()=>openModal('habits'));
-$('#exportButton').addEventListener('click',exportData);
-$('#importInput').addEventListener('change',event=>event.target.files[0]&&importData(event.target.files[0]));
-$('#resetButton').addEventListener('click',()=>{if(confirm('Delete all locally stored PhactoryFit data?')){localStorage.removeItem(STORAGE_KEY);state=defaultState();render();toast('Local data reset.');}});
+  if (form.id === 'addFoodForm') {
+    const food = allFoods().find(item => item.id === data.foodId);
+    const quantity = toNumber(data.quantity, NaN, 0.01, 1000);
+    if (!food || !Number.isFinite(quantity) || !MEALS.includes(data.meal)) { toast('Check the serving amount and meal.'); return; }
+    getDay().foods.push({...food,meal:data.meal,quantity,logId:uid('log')});
+    state.recentFoodIds = [food.id, ...state.recentFoodIds.filter(id => id !== food.id)].slice(0, 12);
+    modal.close();
+    render();
+    toast(`${food.name} added.`);
+    return;
+  }
 
-$('#modalContent').addEventListener('click',event=>{
-  if(event.target.id==='createFoodButton')showCustomFoodForm();
-  if(event.target.id==='lookupBarcode')lookupBarcode($('#barcodeInput').value.trim());
-  if(event.target.id==='cameraBarcode')startBarcodeCamera();
+  if (form.id === 'customFoodForm') {
+    const food = normalizeFood({
+      id:uid('custom'),name:String(data.name || '').trim(),brand:String(data.brand || '').trim() || 'Custom',serving:String(data.serving || '').trim(),
+      calories:data.calories,protein:data.protein,carbs:data.carbs,fat:data.fat,fiber:data.fiber,sugar:0,sodium:data.sodium,aliases:[],barcode:data.barcode || null
+    });
+    if (!food || !food.serving) { toast('Complete the required food fields.'); return; }
+    state.customFoods.push(food);
+    saveState();
+    showFoodQuantity(food, MEALS.includes(data.meal) ? data.meal : modalContext.meal);
+    return;
+  }
+
+  if (form.id === 'workoutForm') {
+    const minutes = toNumber(data.minutes, NaN, 1, 1440);
+    const calories = toNumber(data.calories, 0, 0, 20000);
+    if (!Number.isFinite(minutes) || !String(data.name || '').trim()) { toast('Enter a workout name and valid duration.'); return; }
+    const day = getDay();
+    day.workoutMinutes += minutes;
+    day.exerciseCalories += calories;
+    day.workoutName = String(data.name).trim().slice(0, 200);
+    day.workoutNotes = String(data.notes || '').trim().slice(0, 2000);
+    modal.close();
+    render();
+    toast('Workout logged.');
+    return;
+  }
+
+  if (form.id === 'weightForm') {
+    if (!recordWeight(data.date, data.weight)) { toast('Enter a valid date and weight.'); return; }
+    modal.close();
+    render();
+    toast('Weight saved.');
+    return;
+  }
+
+  if (form.id === 'waterForm') {
+    const change = toNumber(data.cups, NaN, -20, 100);
+    if (!Number.isFinite(change)) { toast('Enter a valid water amount.'); return; }
+    getDay().water = Math.max(0, getDay().water + change);
+    modal.close();
+    render();
+    toast('Water updated.');
+    return;
+  }
+
+  if (form.id === 'habitsForm') {
+    const steps = toNumber(data.steps, NaN, 0, 1000000);
+    const sleep = toNumber(data.sleep, NaN, 0, 24);
+    if (!Number.isFinite(steps) || !Number.isFinite(sleep)) { toast('Enter valid steps and sleep values.'); return; }
+    getDay().steps = Math.round(steps);
+    getDay().sleep = sleep;
+    modal.close();
+    render();
+    toast('Habits saved.');
+    return;
+  }
+
+  if (form.id === 'dateForm') {
+    if (!isDateKey(data.date)) { toast('Choose a valid date.'); return; }
+    state.selectedDate = data.date;
+    getDay();
+    modal.close();
+    render();
+  }
 });
 
-window.addEventListener('resize',()=>{if($('.view[data-view="progress"]').classList.contains('active'))renderProgress();});
+$('#settingsForm').addEventListener('submit', event => {
+  event.preventDefault();
+  const form = event.target;
+  const data = Object.fromEntries(new FormData(form));
+  const nextProfile = {
+    ...state.profile,
+    name:String(data.name || '').trim().slice(0, 80),
+    currentWeight:toNumber(data.currentWeight, NaN, 40, 1500),
+    goalWeight:toNumber(data.goalWeight, NaN, 40, 1500),
+    calorieGoal:Math.round(toNumber(data.calorieGoal, NaN, 500, 10000)),
+    proteinGoal:Math.round(toNumber(data.proteinGoal, NaN, 1, 1000)),
+    carbGoal:Math.round(toNumber(data.carbGoal, NaN, 0, 2000)),
+    fatGoal:Math.round(toNumber(data.fatGoal, NaN, 0, 1000)),
+    weeklyGoal:toNumber(data.weeklyGoal, NaN, -2, 2),
+    eatBackExercise:form.elements.eatBackExercise.checked
+  };
+  if (!nextProfile.name || Object.entries(nextProfile).some(([key, value]) => key !== 'name' && key !== 'eatBackExercise' && !Number.isFinite(value))) {
+    toast('Check the goal values before saving.');
+    return;
+  }
+  const currentChanged = Math.abs(nextProfile.currentWeight - state.profile.currentWeight) >= .05;
+  state.profile = nextProfile;
+  if (currentChanged) recordWeight(localDateKey(), nextProfile.currentWeight);
+  syncCurrentWeight();
+  saveState();
+  render();
+  toast('Goals saved.');
+});
+
+$('#modalClose').addEventListener('click', () => modal.close());
+$('#dateButton').addEventListener('click', () => openModal('date'));
+$('#addFoodFab').addEventListener('click', () => openModal('food'));
+$('#voiceLogButton').addEventListener('click', startVoiceLog);
+$('#waterHabit').addEventListener('click', () => { getDay().water += 1; render(); toast('Added 1 cup of water.'); });
+$('#stepsHabit').addEventListener('click', () => openModal('habits'));
+$('#workoutHabit').addEventListener('click', () => openModal('workout'));
+$('#sleepHabit').addEventListener('click', () => openModal('habits'));
+$('#exportButton').addEventListener('click', exportData);
+$('#importInput').addEventListener('change', event => { if (event.target.files[0]) importData(event.target.files[0]); });
+$('#resetButton').addEventListener('click', () => {
+  if (confirm('Delete all locally stored PhactoryFit data?')) {
+    localStorage.removeItem(STORAGE_KEY);
+    state = defaultState();
+    render();
+    toast('Local data reset.');
+  }
+});
+
+$('#modalContent').addEventListener('click', event => {
+  if (event.target.id === 'createFoodButton') showCustomFoodForm('', selectedMealFromCurrentModal());
+  if (event.target.id === 'lookupBarcode') lookupBarcode($('#barcodeInput').value);
+  if (event.target.id === 'cameraBarcode') startBarcodeCamera();
+});
+
+modal.addEventListener('click', event => {
+  if (event.target === modal) modal.close();
+});
+modal.addEventListener('close', stopBarcodeCamera);
+window.addEventListener('resize', () => {
+  if ($('.view[data-view="progress"]').classList.contains('active')) renderProgress();
+});
+
 registerServiceWorker();
 render();
