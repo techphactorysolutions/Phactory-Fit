@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="PhactoryFit — private, adaptive nutrition and fitness tracking.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>PhactoryFit</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">TECH PHACTORY SOLUTIONS LLC</p>
+        <h1>PhactoryFit</h1>
+      </div>
+      <button id="dateButton" class="date-chip" aria-label="Choose date"></button>
+    </header>
+
+    <main id="app" tabindex="-1">
+      <section class="view active" data-view="today">
+        <div class="hero-card">
+          <div>
+            <p class="muted">Daily readiness</p>
+            <h2 id="greeting">Good evening, Sean</h2>
+            <p id="coachHeadline" class="hero-copy"></p>
+          </div>
+          <div class="score-ring" id="scoreRing" aria-label="Daily score">
+            <span id="dailyScore">0</span><small>%</small>
+          </div>
+        </div>
+
+        <div class="macro-grid">
+          <article class="metric-card calories">
+            <div class="metric-head"><span>Calories</span><strong id="caloriesRemaining">0</strong></div>
+            <p><span id="caloriesConsumed">0</span> of <span id="calorieGoal">0</span> kcal</p>
+            <div class="progress"><span id="calorieBar"></span></div>
+          </article>
+          <article class="metric-card protein">
+            <div class="metric-head"><span>Protein floor</span><strong id="proteinRemaining">0g</strong></div>
+            <p><span id="proteinConsumed">0</span> of <span id="proteinGoal">0</span> g</p>
+            <div class="progress"><span id="proteinBar"></span></div>
+          </article>
+          <article class="metric-card"><div class="metric-head"><span>Carbs</span><strong id="carbConsumed">0g</strong></div><p id="carbGoalText">Goal 0 g</p></article>
+          <article class="metric-card"><div class="metric-head"><span>Fat</span><strong id="fatConsumed">0g</strong></div><p id="fatGoalText">Goal 0 g</p></article>
+        </div>
+
+        <section class="section-card">
+          <div class="section-title"><div><p class="muted">Today</p><h3>Healthy habits</h3></div><button class="text-button" data-nav="diary">Open diary</button></div>
+          <div class="habit-grid">
+            <button class="habit" id="waterHabit"><span>💧</span><strong id="waterValue">0</strong><small>cups</small></button>
+            <button class="habit" id="stepsHabit"><span>👟</span><strong id="stepsValue">0</strong><small>steps</small></button>
+            <button class="habit" id="workoutHabit"><span>🏋️</span><strong id="workoutValue">0</strong><small>minutes</small></button>
+            <button class="habit" id="sleepHabit"><span>🌙</span><strong id="sleepValue">0</strong><small>hours</small></button>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <div class="section-title"><div><p class="muted">Coach insight</p><h3 id="insightTitle">Build your first day</h3></div><span class="badge">Transparent</span></div>
+          <p id="insightBody" class="body-copy"></p>
+          <div id="coachActions" class="chip-row"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="diary">
+        <div class="section-title page-heading"><div><p class="muted">Nutrition</p><h2>Food diary</h2></div><button id="voiceLogButton" class="secondary-button">🎙 Voice log</button></div>
+        <div id="mealSections"></div>
+        <button id="addFoodFab" class="fab" aria-label="Add food">+</button>
+      </section>
+
+      <section class="view" data-view="log">
+        <div class="section-title page-heading"><div><p class="muted">Quick entry</p><h2>Log</h2></div></div>
+        <div class="log-grid">
+          <button class="action-card" data-modal="food"><span>🍽️</span><strong>Food</strong><small>Search, scan, or create</small></button>
+          <button class="action-card" data-modal="barcode"><span>▥</span><strong>Barcode</strong><small>Scan once, remember locally</small></button>
+          <button class="action-card" data-modal="workout"><span>🏋️</span><strong>Workout</strong><small>Strength or cardio</small></button>
+          <button class="action-card" data-modal="weight"><span>⚖️</span><strong>Weight</strong><small>Trend-aware progress</small></button>
+          <button class="action-card" data-modal="water"><span>💧</span><strong>Water</strong><small>Fast hydration entry</small></button>
+          <button class="action-card" data-modal="habits"><span>✅</span><strong>Habits</strong><small>Steps and sleep</small></button>
+        </div>
+      </section>
+
+      <section class="view" data-view="progress">
+        <div class="section-title page-heading"><div><p class="muted">Trends, not noise</p><h2>Progress</h2></div><button class="secondary-button" data-modal="weight">Log weight</button></div>
+        <div class="stats-row">
+          <article><span>Current</span><strong id="currentWeight">—</strong></article>
+          <article><span>Goal</span><strong id="goalWeight">—</strong></article>
+          <article><span>Change</span><strong id="weightChange">—</strong></article>
+        </div>
+        <section class="section-card chart-card">
+          <div class="section-title"><div><p class="muted">7-day trend</p><h3>Body weight</h3></div><span id="trendLabel" class="badge">Need data</span></div>
+          <canvas id="weightChart" width="700" height="320" aria-label="Weight trend chart"></canvas>
+        </section>
+        <section class="section-card">
+          <div class="section-title"><div><p class="muted">Adaptive engine</p><h3>Weekly recommendation</h3></div></div>
+          <p id="adaptiveRecommendation" class="body-copy"></p>
+          <p class="fine-print">Recommendations require consistent nutrition and weigh-in data. They are fitness guidance, not medical advice.</p>
+        </section>
+        <section class="section-card">
+          <div class="section-title"><div><p class="muted">Consistency</p><h3>Last 7 days</h3></div></div>
+          <div id="consistencyGrid" class="consistency-grid"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="coach">
+        <div class="section-title page-heading"><div><p class="muted">Explainable guidance</p><h2>Coach</h2></div></div>
+        <section class="coach-card">
+          <span class="coach-icon">P</span>
+          <div><h3 id="coachMainTitle">Your plan is ready</h3><p id="coachMainBody"></p></div>
+        </section>
+        <div id="coachFeed" class="coach-feed"></div>
+        <section class="section-card">
+          <div class="section-title"><div><p class="muted">Protein rescue</p><h3>High-protein options</h3></div></div>
+          <div id="proteinRescue" class="rescue-list"></div>
+        </section>
+      </section>
+
+      <section class="view" data-view="settings">
+        <div class="section-title page-heading"><div><p class="muted">Control center</p><h2>Settings</h2></div></div>
+        <form id="settingsForm" class="settings-form section-card">
+          <label>Name<input name="name" type="text" required></label>
+          <div class="two-col"><label>Current weight (lb)<input name="currentWeight" type="number" step="0.1" required></label><label>Goal weight (lb)<input name="goalWeight" type="number" step="0.1" required></label></div>
+          <div class="two-col"><label>Daily calories<input name="calorieGoal" type="number" required></label><label>Protein minimum (g)<input name="proteinGoal" type="number" required></label></div>
+          <div class="two-col"><label>Carb goal (g)<input name="carbGoal" type="number" required></label><label>Fat goal (g)<input name="fatGoal" type="number" required></label></div>
+          <label>Weekly goal (lb/week)<input name="weeklyGoal" type="number" step="0.1" min="-2" max="2" required></label>
+          <label class="toggle-row"><span><strong>Count exercise calories</strong><small>Off by default to prevent accidental overeating</small></span><input name="eatBackExercise" type="checkbox"></label>
+          <button class="primary-button" type="submit">Save goals</button>
+        </form>
+        <section class="section-card">
+          <div class="section-title"><div><p class="muted">Your data</p><h3>Backup and privacy</h3></div></div>
+          <p class="body-copy">Your diary stays in this browser unless you export it. No account or private API key is required.</p>
+          <div class="button-stack"><button id="exportButton" class="secondary-button">Export backup</button><label class="secondary-button file-label">Import backup<input id="importInput" type="file" accept="application/json"></label><button id="resetButton" class="danger-button">Reset local data</button></div>
+        </section>
+        <p class="branding">Designed by Tech Phactory Solutions LLC<br><span>Optional external food data: Open Food Facts (ODbL)</span></p>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button class="active" data-view-target="today"><span>⌂</span><small>Today</small></button>
+      <button data-view-target="diary"><span>☷</span><small>Diary</small></button>
+      <button class="log-button" data-view-target="log"><span>＋</span><small>Log</small></button>
+      <button data-view-target="progress"><span>↗</span><small>Progress</small></button>
+      <button data-view-target="coach"><span>✦</span><small>Coach</small></button>
+      <button data-view-target="settings"><span>⚙</span><small>Settings</small></button>
+    </nav>
+  </div>
+
+  <dialog id="modal">
+    <div class="modal-shell">
+      <div class="modal-header"><div><p id="modalEyebrow" class="muted"></p><h2 id="modalTitle"></h2></div><button type="button" id="modalClose" class="icon-button" aria-label="Close">×</button></div>
+      <div id="modalContent"></div>
+    </div>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
