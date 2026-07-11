@@ -194,6 +194,10 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const modal = $('#modal');
 let toastTimer;
 let activeMediaStream = null;
+let activeBarcodeControls = null;
+let activeBarcodeTimeout = null;
+let barcodeScanSession = 0;
+let barcodeCameraStarting = false;
 let modalContext = {meal:'Breakfast'};
 
 function saveState() {
@@ -532,15 +536,31 @@ function navigate(view) {
   if (view === 'progress') setTimeout(renderProgress, 30);
 }
 
+function setBarcodeCameraButton(scanning) {
+  const button = $('#cameraBarcode');
+  if (!button) return;
+  button.disabled = false;
+  button.textContent = scanning ? 'Stop camera' : 'Use camera';
+  button.setAttribute('aria-pressed', scanning ? 'true' : 'false');
+}
+
 function stopBarcodeCamera() {
+  barcodeScanSession += 1;
+  barcodeCameraStarting = false;
+  if (activeBarcodeTimeout) clearTimeout(activeBarcodeTimeout);
+  activeBarcodeTimeout = null;
+  try { activeBarcodeControls?.stop?.(); } catch (error) { console.warn('Barcode controls did not stop cleanly', error); }
+  activeBarcodeControls = null;
   activeMediaStream?.getTracks?.().forEach(track => track.stop());
   activeMediaStream = null;
   const video = $('#barcodeVideo');
   if (video) {
     video.pause?.();
     video.srcObject = null;
-    video.hidden = true;
   }
+  const shell = $('#barcodeCameraShell');
+  if (shell) shell.hidden = true;
+  setBarcodeCameraButton(false);
 }
 
 function openModal(type, options = {}) {
@@ -577,7 +597,7 @@ function foodModal(meal) {
 }
 
 function barcodeModal(meal) {
-  return `<div class="modal-form"><p class="form-note">Enter a UPC/EAN code. Known barcodes work offline. For an unknown product, create its nutrition record once and PhactoryFit will remember it on this device. Camera detection depends on browser support.</p><label>Meal<select id="barcodeMeal">${mealOptions(meal)}</select></label><label>Barcode<input id="barcodeInput" inputmode="numeric" autocomplete="off" placeholder="e.g. 049000050103"></label><div class="inline-actions"><button type="button" class="primary-button" id="lookupBarcode">Look up</button><button type="button" class="secondary-button" id="cameraBarcode">Use camera</button></div><video id="barcodeVideo" playsinline hidden style="width:100%;border-radius:14px"></video><div id="barcodeResult"></div></div>`;
+  return `<div class="modal-form"><p class="form-note">Enter a UPC/EAN code, scan it live with the rear camera, or take a barcode photo. Known barcodes work offline. Unknown products can be saved once and remembered on this device.</p><label>Meal<select id="barcodeMeal">${mealOptions(meal)}</select></label><label>Barcode<input id="barcodeInput" inputmode="numeric" autocomplete="off" placeholder="e.g. 049000050103"></label><div class="inline-actions"><button type="button" class="primary-button" id="lookupBarcode">Look up</button><button type="button" class="secondary-button" id="cameraBarcode" aria-pressed="false">Use camera</button></div><label class="secondary-button file-label barcode-photo-button">Take barcode photo<input id="barcodePhotoInput" type="file" accept="image/*" capture="environment"></label><div id="barcodeCameraShell" class="barcode-camera-shell" hidden><video id="barcodeVideo" playsinline muted autoplay aria-label="Live barcode camera preview"></video><div class="barcode-scan-guide" aria-hidden="true"></div></div><div id="barcodeResult" role="status" aria-live="polite"></div></div>`;
 }
 
 function workoutModal() {
@@ -718,38 +738,212 @@ async function lookupBarcode(code) {
   $('#teachBarcodeFood').onclick = () => showCustomFoodForm(normalizedCode, selectedMeal);
 }
 
-async function startBarcodeCamera() {
+function barcodeCameraErrorMessage(error) {
+  const name = String(error?.name || '');
+  if (!window.isSecureContext) return 'Camera access requires the secure HTTPS version of PhactoryFit. Open the GitHub Pages link instead of a downloaded HTML file.';
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return 'Camera permission was blocked. Allow camera access for this site in Safari or browser settings, then tap Use camera again.';
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
+  if (name === 'NotReadableError' || name === 'TrackStartError') return 'The camera is busy or unavailable. Close other camera apps and try again.';
+  if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The rear camera could not start with the requested settings. Try again after rotating the phone.';
+  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner did not finish loading. Refresh PhactoryFit once while online, then try again.';
+  return 'The camera could not start. Check camera permission and try again.';
+}
+
+function normalizeScannedBarcode(value) {
+  const code = String(value || '').replace(/\D/g, '').slice(0, 14);
+  return code.length >= 8 && code.length <= 14 ? code : '';
+}
+
+async function scanBarcodePhoto(file) {
   const result = $('#barcodeResult');
-  if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
-    result.innerHTML = '<p class="form-note">Camera barcode detection is not supported by this browser. Enter the barcode number printed below the package barcode.</p>';
+  if (!result || !file) return;
+  if (!String(file.type || '').startsWith('image/')) {
+    result.innerHTML = '<p class="form-note">Choose a photo containing a UPC or EAN barcode.</p>';
     return;
   }
+
   stopBarcodeCamera();
+  result.innerHTML = '<p class="form-note camera-status">Reading barcode photo…</p>';
+  let objectUrl = '';
+  let bitmap = null;
   try {
-    const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
-    activeMediaStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
-    const video = $('#barcodeVideo');
-    video.hidden = false;
-    video.srcObject = activeMediaStream;
-    await video.play();
-    result.innerHTML = '<p class="form-note">Point the camera at the barcode.</p>';
-    const started = Date.now();
-    while (Date.now() - started < 20000 && modal.open && activeMediaStream) {
-      const codes = await detector.detect(video);
-      if (codes.length) {
-        const code = codes[0].rawValue;
-        $('#barcodeInput').value = code;
-        stopBarcodeCamera();
-        await lookupBarcode(code);
-        return;
-      }
-      await new Promise(resolve => setTimeout(resolve, 250));
+    let rawValue = '';
+    if ('BarcodeDetector' in window && globalThis.createImageBitmap) {
+      bitmap = await createImageBitmap(file);
+      const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
+      const codes = await detector.detect(bitmap);
+      rawValue = codes.find(code => normalizeScannedBarcode(code.rawValue))?.rawValue || '';
     }
-    throw new Error('No barcode detected');
+
+    if (!rawValue) {
+      if (!window.ZXingBrowser?.BrowserMultiFormatReader) {
+        const error = new Error('ZXing browser scanner unavailable');
+        error.name = 'ScannerLibraryUnavailable';
+        throw error;
+      }
+      objectUrl = URL.createObjectURL(file);
+      const reader = new window.ZXingBrowser.BrowserMultiFormatReader();
+      const decoded = await reader.decodeFromImageUrl(objectUrl);
+      rawValue = typeof decoded?.getText === 'function' ? decoded.getText() : decoded?.text;
+    }
+
+    const code = normalizeScannedBarcode(rawValue);
+    if (!code) throw new DOMException('No supported barcode detected.', 'NotFoundError');
+    const input = $('#barcodeInput');
+    if (input) input.value = code;
+    await lookupBarcode(code);
   } catch (error) {
+    console.warn('Barcode photo scan failed', error);
+    const currentResult = $('#barcodeResult');
+    if (currentResult) currentResult.innerHTML = `<p class="form-note">${escapeHtml(error?.name === 'ScannerLibraryUnavailable' ? barcodeCameraErrorMessage(error) : 'No barcode was found in that photo. Fill the frame with the barcode, avoid glare, and try again.')}</p>`;
+  } finally {
+    bitmap?.close?.();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    const input = $('#barcodePhotoInput');
+    if (input) input.value = '';
+  }
+}
+
+async function completeBarcodeScan(rawValue, session) {
+  if (session !== barcodeScanSession || !modal.open) return;
+  const code = normalizeScannedBarcode(rawValue);
+  if (!code) return;
+  const input = $('#barcodeInput');
+  if (input) input.value = code;
+  stopBarcodeCamera();
+  await lookupBarcode(code);
+}
+
+async function startNativeBarcodeScanner(video, result, session) {
+  const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
+  activeMediaStream = await navigator.mediaDevices.getUserMedia({
+    audio:false,
+    video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+  });
+  if (session !== barcodeScanSession || !modal.open) {
+    stopBarcodeCamera();
+    return;
+  }
+  video.srcObject = activeMediaStream;
+  await video.play();
+  result.innerHTML = '<p class="form-note camera-status">Camera ready. Center the barcode inside the frame and hold still.</p>';
+  const started = Date.now();
+  while (Date.now() - started < 30000 && session === barcodeScanSession && modal.open && activeMediaStream) {
+    const codes = await detector.detect(video);
+    if (codes.length && normalizeScannedBarcode(codes[0].rawValue)) {
+      await completeBarcodeScan(codes[0].rawValue, session);
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 180));
+  }
+  if (session === barcodeScanSession) throw new DOMException('No barcode detected before timeout.', 'TimeoutError');
+}
+
+async function startZxingBarcodeScanner(video, result, session) {
+  if (!window.ZXingBrowser?.BrowserMultiFormatReader) {
+    const error = new Error('ZXing browser scanner unavailable');
+    error.name = 'ScannerLibraryUnavailable';
+    throw error;
+  }
+
+  const reader = new window.ZXingBrowser.BrowserMultiFormatReader(undefined, {
+    delayBetweenScanAttempts: 120,
+    delayBetweenScanSuccess: 500
+  });
+  if (window.ZXingBrowser.BarcodeFormat) {
+    reader.possibleFormats = [
+      window.ZXingBrowser.BarcodeFormat.EAN_13,
+      window.ZXingBrowser.BarcodeFormat.EAN_8,
+      window.ZXingBrowser.BarcodeFormat.UPC_A,
+      window.ZXingBrowser.BarcodeFormat.UPC_E
+    ];
+  }
+
+  const controls = await reader.decodeFromConstraints({
+    audio:false,
+    video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+  }, video, (scanResult, scanError, callbackControls) => {
+    if (session !== barcodeScanSession || !modal.open) {
+      callbackControls?.stop?.();
+      return;
+    }
+    if (!scanResult) return;
+    const text = typeof scanResult.getText === 'function' ? scanResult.getText() : scanResult.text;
+    if (!normalizeScannedBarcode(text)) return;
+    activeBarcodeControls = callbackControls || activeBarcodeControls;
+    void completeBarcodeScan(text, session);
+  });
+
+  if (session !== barcodeScanSession || !modal.open) {
+    controls?.stop?.();
+    return;
+  }
+  activeBarcodeControls = controls;
+  activeMediaStream = video.srcObject;
+  result.innerHTML = '<p class="form-note camera-status">Camera ready. Center the barcode inside the frame and hold still.</p>';
+  activeBarcodeTimeout = setTimeout(() => {
+    if (session !== barcodeScanSession) return;
+    stopBarcodeCamera();
+    const currentResult = $('#barcodeResult');
+    if (currentResult) currentResult.innerHTML = '<p class="form-note">No barcode was detected. Improve the lighting, move the package slightly farther away, and try again.</p>';
+  }, 30000);
+}
+
+async function startBarcodeCamera() {
+  const result = $('#barcodeResult');
+  const video = $('#barcodeVideo');
+  const shell = $('#barcodeCameraShell');
+  if (!result || !video || !shell) return;
+
+  if (barcodeCameraStarting || activeMediaStream || activeBarcodeControls) {
+    stopBarcodeCamera();
+    result.innerHTML = '<p class="form-note">Camera stopped.</p>';
+    return;
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    const error = new Error('getUserMedia unavailable');
+    error.name = 'NotSupportedError';
+    result.innerHTML = `<p class="form-note">${escapeHtml(barcodeCameraErrorMessage(error))}</p>`;
+    return;
+  }
+
+  stopBarcodeCamera();
+  const session = barcodeScanSession;
+  barcodeCameraStarting = true;
+  shell.hidden = false;
+  setBarcodeCameraButton(true);
+  result.innerHTML = '<p class="form-note camera-status">Requesting camera access…</p>';
+
+  try {
+    if ('BarcodeDetector' in window) {
+      try {
+        await startNativeBarcodeScanner(video, result, session);
+      } catch (nativeError) {
+        if (session !== barcodeScanSession) return;
+        const permissionErrors = new Set(['NotAllowedError','PermissionDeniedError','NotFoundError','NotReadableError','SecurityError']);
+        if (permissionErrors.has(String(nativeError?.name || ''))) throw nativeError;
+        console.warn('Native barcode detector unavailable; switching to bundled scanner', nativeError);
+        stopBarcodeCamera();
+        const fallbackSession = barcodeScanSession;
+        barcodeCameraStarting = true;
+        shell.hidden = false;
+        setBarcodeCameraButton(true);
+        result.innerHTML = '<p class="form-note camera-status">Starting camera scanner…</p>';
+        await startZxingBarcodeScanner(video, result, fallbackSession);
+      }
+    } else {
+      await startZxingBarcodeScanner(video, result, session);
+    }
+  } catch (error) {
+    if (session !== barcodeScanSession && !barcodeCameraStarting) return;
     console.warn('Camera barcode scan failed', error);
     stopBarcodeCamera();
-    if ($('#barcodeResult')) $('#barcodeResult').innerHTML = '<p class="form-note">The camera could not read the barcode. Enter the printed digits manually.</p>';
+    const currentResult = $('#barcodeResult');
+    if (currentResult) currentResult.innerHTML = `<p class="form-note">${escapeHtml(barcodeCameraErrorMessage(error))}</p>`;
+  } finally {
+    barcodeCameraStarting = false;
+    if (!activeMediaStream && !activeBarcodeControls) setBarcodeCameraButton(false);
   }
 }
 
@@ -1020,6 +1214,12 @@ $('#modalContent').addEventListener('click', event => {
   if (event.target.id === 'createFoodButton') showCustomFoodForm('', selectedMealFromCurrentModal());
   if (event.target.id === 'lookupBarcode') lookupBarcode($('#barcodeInput').value);
   if (event.target.id === 'cameraBarcode') startBarcodeCamera();
+});
+
+$('#modalContent').addEventListener('change', event => {
+  if (event.target.id === 'barcodePhotoInput' && event.target.files?.[0]) {
+    void scanBarcodePhoto(event.target.files[0]);
+  }
 });
 
 modal.addEventListener('click', event => {

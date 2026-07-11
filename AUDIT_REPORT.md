@@ -1,87 +1,75 @@
-# PhactoryFit v1.1.0 Audit Report
+# PhactoryFit v1.2.0 Repair Report
 
-**Audit date:** July 11, 2026  
-**Target:** Mobile-first static PWA for GitHub Pages and iPhone Home Screen installation
+**Repair date:** July 11, 2026  
+**Target:** iPhone Safari and installed GitHub Pages PWA
 
 ## Final status
 
-**PASS — the repaired application loads, renders, persists data, and completes the tested core workflows without uncaught browser errors.**
+**PASS — the reported Home Screen icon and barcode-camera compatibility defects were repaired in the deployable package.**
 
-## Test coverage completed
+## Root causes
 
-### Automated integration suite — 14/14 passed
+### 1. iPhone Home Screen showed a generic “P” tile
 
-- Initial render and local-state initialization
-- Food search, selected-meal preservation, and serving multiplication
-- Custom food creation, logging, and diary removal
-- Local barcode learning and repeat lookup
-- Open Food Facts proxy serving-size normalization
-- Coach action routing
-- Exact protein-rescue food selection
-- Backdated and current weight behavior
-- Settings and weight-history synchronization
-- Water, workouts, steps, sleep, and date switching
-- Backup import and invalid-backup rejection
-- Corrupt/legacy local-state repair
-- Over-target coaching language
-- Future weigh-in rejection
+iOS had installed a generated fallback shortcut icon instead of the intended PhactoryFit artwork. Existing iPhone Home Screen shortcuts also normally retain the icon captured at installation time rather than refreshing it automatically.
 
-### Chromium mobile browser audit — 9/9 passed
+### 2. “Use camera” reported that scanning was unsupported
 
-Tested at a 390 × 844 mobile viewport using the Chromium browser engine:
+The earlier packaged release depended on the browser-native `BarcodeDetector` API. iPhone Safari may provide camera access but not that detector API, so the old code rejected the camera workflow before opening a usable scanner.
 
-- Initial application render
-- State persistence
-- No horizontal page overflow
-- Food addition to the selected meal
-- Calorie calculation update
-- Workout and habit persistence
-- Protein-rescue mapping
-- Backdated weight handling
-- Progress-screen navigation and chart rendering
+## Repairs completed
 
-No uncaught runtime errors or browser-console errors were detected during the Chromium flow.
+- Added a dedicated root-level `apple-touch-icon.png` file.
+- Added an explicit 180 × 180 Apple touch icon declaration.
+- Added standard 192 × 192 and 512 × 512 PWA icons.
+- Added separate maskable icon declarations.
+- Added a 32 × 32 browser favicon.
+- Updated service-worker caching to `phactoryfit-v1.2.0`.
+- Added cache-versioned application scripts and styles.
+- Bundled the ZXing browser barcode reader locally.
+- Added live rear-camera scanning for browsers without native `BarcodeDetector` support.
+- Added a `Take barcode photo` fallback using `capture="environment"`.
+- Added camera permission, unavailable-device, timeout, and secure-context messages.
+- Added stream and camera-control cleanup on close, timeout, failure, and successful scan.
+- Included the ZXing license file.
 
-### PWA and static checks
+## Verification completed
 
-- JavaScript syntax checks: passed
-- ESLint undefined-variable and unreachable-code checks: passed
-- HTML validation and accessibility structure: passed
-- Manifest JSON parsing: passed
-- Service-worker install cache: passed
-- Old-cache cleanup on activation: passed
-- Online navigation and offline fallback behavior: passed
-- Cross-origin request bypass: passed
-- Required file-reference verification: passed
-- Credential and secret scan: passed
+### Static and package checks — 39/39 passed
 
-## Defects found and repaired
+- JavaScript syntax validation
+- Service-worker syntax validation
+- HTML parsing
+- Apple touch icon declaration
+- Manifest declaration and JSON parsing
+- Standard and maskable icon declarations
+- Icon-file existence and exact pixel dimensions
+- Root Apple icon existence and 180 × 180 dimensions
+- Favicon dimensions
+- ZXing script inclusion
+- ZXing bundle presence
+- ZXing image-decoding method presence
+- Live-camera fallback implementation
+- Camera-photo fallback implementation
+- Removal of the old unsupported-browser-only rejection
+- Camera-track cleanup implementation
+- Service-worker cache version
+- Every service-worker asset reference
+- Basic credential and secret scan
 
-1. **Food serving submission was blocked in real browsers.** The serving input used `min="0.01"` with `step="0.25"`, which made normal values such as 1 and 2 invalid. The input now uses compatible hundredth-serving increments.
-2. **“Update sleep” opened the food logger.** Coach actions now use explicit action routing and open the habits form correctly.
-3. **Protein-rescue buttons could select the wrong food or do nothing.** Each recommendation now maps to an exact food ID.
-4. **Backdated weigh-ins could replace the current weight.** Current weight is now derived from the most recent dated entry; future weigh-ins are rejected.
-5. **Custom and barcode foods lost the selected meal.** Meal context now survives food creation, barcode teaching, lookup, and final diary entry.
-6. **Malformed backups or legacy browser data could crash rendering.** A state-normalization and migration layer now validates dates, numbers, foods, days, weights, and profile goals.
-7. **External barcode serving calculations could parse “1 bottle (414 ml)” as 1 gram.** Serving normalization now extracts the actual gram or milliliter amount and rounds stored nutrient values.
-8. **Camera streams could continue after the modal closed.** Active tracks are now stopped during close, timeout, error, and successful detection.
-9. **The trend-rate calculation understated weight change.** The adaptive engine now uses linear regression over recent dated weigh-ins and requires an adequate date span.
-10. **Over-target displays could show confusing negative remaining calories.** The dashboard now reports calories “over,” and coaching avoids negative remaining values.
-11. **Progress rendering created unused empty diary days.** Read-only trend calculations no longer mutate local data.
-12. **The original service worker could hold stale application files too aggressively.** The cache was versioned to v1.1.0 and now refreshes static assets while preserving offline fallback.
-13. **Input and accessibility metadata was incomplete.** Buttons now have explicit types, settings have safe bounds, the score and chart have appropriate accessible labels, and iPhone standalone metadata was added.
+### HTTP deployment smoke test — passed
 
-## Security and privacy review
+A local static server returned HTTP 200 for:
 
-- No API keys, passwords, access tokens, private credentials, or backend secrets are included.
-- The optional external food proxy is disabled by default in `config.js`.
-- User-entered and external product text is escaped before HTML rendering.
-- Imported data is validated and bounded before use.
-- Local reset requires confirmation.
-- Data remains in the browser unless the user exports a backup.
+- Application root
+- `app.js`
+- Bundled ZXing scanner
+- Apple touch icon
+- Web app manifest
+- Service worker
 
-## Environment limitations
+## Required iPhone refresh procedure
 
-The camera barcode workflow requires a supported browser and physical camera, and voice logging requires browser speech-recognition support. Those hardware-permission paths could not be fully exercised in this sandbox; their unsupported/error fallbacks were reviewed. The optional Open Food Facts path was tested with a mocked compliant proxy response because no production proxy URL is configured.
+The old Home Screen shortcut must be deleted after deploying v1.2.0. Then open the refreshed GitHub Pages site in Safari and add it to the Home Screen again. The already-installed shortcut is not expected to replace its cached icon automatically.
 
-After deployment, perform one final iPhone smoke test over the generated GitHub Pages HTTPS URL: open the app, add one food, reload, add it to the Home Screen, enable Airplane Mode, and confirm the installed shell opens.
+The live physical camera, autofocus, and Safari permission prompt cannot be fully exercised in this sandbox. The code paths, packaged scanner, image-capture fallback, static references, and secure-context handling were verified. A final device smoke test should confirm camera permission and barcode focus after deployment.

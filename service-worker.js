@@ -1,14 +1,20 @@
-const CACHE = 'phactoryfit-v1.1.0';
+const CACHE = 'phactoryfit-v1.2.0';
 const OFFLINE_PAGE = './index.html';
 const APP_SHELL = [
   './',
   OFFLINE_PAGE,
-  './styles.css',
-  './app.js',
-  './config.js',
+  './styles.css?v=1.2.0',
+  './app.js?v=1.2.0',
+  './config.js?v=1.2.0',
+  './vendor/zxing-browser.min.js?v=1.2.0',
   './manifest.webmanifest',
+  './apple-touch-icon.png',
+  './assets/favicon-32.png',
+  './assets/apple-touch-icon-180.png',
   './assets/icon-192.png',
-  './assets/icon-512.png'
+  './assets/icon-512.png',
+  './assets/icon-maskable-192.png',
+  './assets/icon-maskable-512.png'
 ];
 
 self.addEventListener('install', event => {
