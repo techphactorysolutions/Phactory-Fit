@@ -1,136 +1,138 @@
-# PhactoryFit v1.6.2
+# PhactoryFit 1.7.0
 
-PhactoryFit is an original, mobile-first nutrition and fitness tracker designed by **Tech Phactory Solutions LLC**. The current release is a static Progressive Web App intended for GitHub Pages, iPhone Safari, and installation to the iPhone Home Screen.
+PhactoryFit is an original, mobile-first nutrition and fitness tracker designed by **Tech Phactory Solutions LLC**. It is a static, local-first Progressive Web App for GitHub Pages, iPhone Safari, and iPhone Home Screen installation.
 
-## Current production scope
+## Current features
 
-The v1.6.2 audit uses the implemented v1.5.0 feature set as the source of truth. Placeholder examples from the audit prompt—such as supplement cycling, body photos, wearable synchronization, and a local AI agent—were not treated as existing requirements because they are not implemented in this codebase.
-
-### Nutrition and food logging
+### Nutrition
 
 - Breakfast, lunch, dinner, and snack diary
-- Daily calories, protein, carbohydrates, fat, fiber, sugar, and sodium
-- Configurable calorie and macro targets
-- Protein-floor tracking
-- Starter foods and user-created foods
+- Calories, protein, carbohydrates, fat, fiber, sugar, and sodium
+- Configurable calorie and macro targets with a protein floor
+- Starter foods, custom foods, and recent foods
 - Online packaged-food and brand search
-- Barcode number lookup, live camera scanning, and barcode-photo scanning
-- Generated Nutrition Facts display
-- Decimal serving quantities and quick serving controls
-- Local product memory after a successful log
-- Manual correction workflow for incomplete or inaccurate product records
+- Manual UPC/EAN lookup, live camera scanning, and barcode-photo scanning
+- Generated Nutrition Facts panel with fractional serving quantities
+- Local product memory and package-label correction workflow
 
 ### Fitness and progress
 
-- Workout minutes and exercise-calorie logging
-- Water, steps, sleep, and weight entries
+- Water, steps, sleep, workout minutes, exercise calories, and weight logging
 - Daily consistency score
-- Weight chart using actual date spacing
-- Trend-aware calorie guidance
-- Protein-rescue suggestions
+- Weight history chart using real date spacing
+- Trend-aware calorie guidance and protein-rescue suggestions
 
-### Data ownership and deployment
+### Data ownership
 
-- Local-first browser storage
-- Validated JSON backup export and import
-- Installable PWA shell
-- Offline application asset caching
-- No build step
-- No embedded API keys, passwords, or private credentials
+- Local browser storage; no PhactoryFit account required
+- JSON backup export and validated import
+- Offline application shell
+- No advertising, analytics SDK, payment system, or private API key
 
-## v1.6.2 iPhone camera repair
+## Security-hardened public release
 
-- Removed the `pagehide` listener that could stop the camera while iPhone Safari was presenting or dismissing the permission sheet.
-- Keeps a granted camera stream open when Safari delays or pauses the video preview.
-- Shows **Start preview** for a user-gesture recovery instead of immediately closing the scanner.
-- Requests simple rear-camera constraints first on iPhone, then applies optional focus and zoom after the stream is live.
-- Reattaches the same stream after transient visibility changes.
-- Performs one controlled reconnect if Safari unexpectedly ends the track.
-- Continues to stop all tracks when the user explicitly closes the scanner or modal.
+Version 1.7.0 adds a dedicated public-release security baseline:
 
-The nutrition, food-search, serving-size, data-integrity, progress-chart, backup, offline, and accessibility repairs from v1.6.0/v1.6.1 remain included.
+- restrictive Content Security Policy;
+- same-origin executable scripts only;
+- no runtime JavaScript CDN;
+- exact vendored ZXing dependency lock and SHA-256 verification;
+- HTML escaping and API/image URL allowlists;
+- bounded API responses, imports, photos, image dimensions, search input, and stored records;
+- no-referrer, credential-free external requests;
+- allowlist-only service-worker caching;
+- anti-framing guard;
+- generic first-run profile rather than developer-specific information;
+- camera, barcode, voice, and external-data privacy disclosure;
+- repeatable static, browser-security, regression, and dependency tests;
+- GitHub Actions and Dependabot configuration.
 
-## Food-search workflow
-
-1. Open **Log → Food**.
-2. Choose Breakfast, Lunch, Dinner, or Snacks.
-3. Search for a food, product, or brand such as Doritos, Pepsi, or Coke.
-4. Select a packaged-food result.
-5. Verify the serving size and Nutrition Facts against the package.
-6. Select the number of servings consumed.
-7. Tap **Add to diary**.
-
-Products already saved on the device remain available offline. New online searches require a network connection.
+Read [SECURITY.md](SECURITY.md), [PRIVACY.md](PRIVACY.md), and [THREAT_MODEL.md](THREAT_MODEL.md) before public deployment.
 
 ## Barcode workflow
 
 1. Open **Log → Barcode**.
-2. Type the UPC/EAN, use the camera, or take a barcode photo.
-3. Keep the entire barcode inside the target guide and avoid glare.
-4. Review the generated Nutrition Facts.
-5. Choose the meal and serving quantity.
+2. Type a UPC/EAN, tap **Use camera**, or take a barcode photo.
+3. Keep the complete barcode inside the target guide and avoid glare.
+4. Review the generated Nutrition Facts and serving size.
+5. Choose the meal and amount consumed.
 6. Add the product to the diary.
 
-A barcode identifies a product; it does not contain the nutrition data itself. The app retrieves nutrition from the configured product database and requires a manual verified entry when core nutrition is incomplete.
+Camera frames and barcode photos are decoded locally. Unknown barcode numbers are sent to Open Food Facts to retrieve community-contributed nutrition data.
+
+## Food search workflow
+
+1. Open **Log → Food**.
+2. Choose a meal.
+3. Search for a generic food, product, or brand such as Doritos, Pepsi, or Coke.
+4. Select a packaged-food result.
+5. Verify the package serving and Nutrition Facts.
+6. Choose the number of servings and add it to the diary.
 
 ## GitHub Pages deployment
 
-The GitHub-ready ZIP is intentionally flat. Upload every file from the ZIP directly to the repository root. No nested runtime folders are required.
+The release ZIP is ready to upload to a repository root.
 
-1. Export a PhactoryFit backup first if you already have logged data.
-2. Delete or replace the older repository files.
-3. Upload every file from the v1.6.2 ZIP to the repository root.
-4. Wait for GitHub Pages to finish deploying.
-5. Open the HTTPS Pages address directly in Safari.
-6. Refresh twice, then fully close and reopen Safari.
-7. Open Settings and confirm **Version 1.6.2**.
-8. Test **Log → Barcode → Use camera**.
+1. Export a backup from the older app before replacing files.
+2. Replace the repository files with the contents of the 1.7.0 ZIP.
+3. Keep `.github/workflows/security.yml` and `.github/dependabot.yml` in the repository.
+4. In GitHub Pages settings, deploy from the intended production branch and enforce HTTPS.
+5. Prefer a dedicated, verified custom domain or subdomain for storage isolation.
+6. Enable secret scanning, push protection, private vulnerability reporting, branch protection, and required security checks.
+7. Open the deployed site in Safari and confirm Settings displays **Version 1.7.0**.
+8. Close and reopen the installed Home Screen app so the new service worker takes control.
 
-Existing diary data remains compatible because the local-storage key is unchanged.
+The app has no build requirement. `package.json` and `package-lock.json` exist only to make the vendored scanner dependency visible to automated security tooling.
 
-## Audit results
+## Local verification
 
-- 17/17 full browser regression tests passed.
-- 4/4 focused iPhone camera lifecycle checks passed.
-- 61/61 deployment-package checks passed.
-- 83/83 full source-audit checks passed.
+### Static and syntax checks
 
-The deployable ZIP omits development-only test folders. The included `BROWSER_TEST_RESULTS.txt`, `STATIC_AUDIT_RESULTS.txt`, and `AUDIT_REPORT.md` document the completed checks.
+```bash
+python3 tests/security_static.py
+node --check app.js
+node --check service-worker.js
+```
 
-## Required physical iPhone verification
+### Dependency verification
 
-The automated environment cannot operate a real iPhone camera or reproduce every Safari permission state. Before public release, test the deployed HTTPS site on the target iPhone:
+Use Node.js 24 or newer:
 
-1. Grant camera permission and scan one UPC-A and one EAN-13 package.
-2. Leave the camera permission sheet open for several seconds and confirm the scanner remains active afterward.
-3. Compare calories and macros against the physical package label.
-4. Background and resume the app, then verify the preview resumes or offers **Start preview**.
-5. Close the scanner and confirm the camera indicator turns off.
-6. Test saved-food logging without a network connection.
-7. Export, reset, and re-import a backup.
+```bash
+npm ci --ignore-scripts
+cmp --silent zxing-browser.min.js node_modules/@zxing/browser/umd/zxing-browser.min.js
+npm audit --omit=dev --audit-level=high
+```
 
-## Product lookup configuration
+### Browser security checks
 
-By default, PhactoryFit uses direct, read-only Open Food Facts requests. `config.js` also supports optional production proxies:
+Install Playwright and ensure Chromium is available, then run:
 
-- `offProxyUrl`: accepts `?barcode=UPC_OR_EAN`
-- `offSearchProxyUrl`: accepts `?q=SEARCH_TEXT` and returns a `products` array
+```bash
+python3 tests/browser_security.py
+```
 
-No secret should be placed in this public client-side file.
+The complete functional/barcode suite used during this release is summarized in `BROWSER_TEST_RESULTS.txt`; the security-specific run is in `SECURITY_TEST_RESULTS.txt`.
+
+## Required physical iPhone checks
+
+Automated browser tests cannot operate a real iPhone camera or reproduce every Safari permission lifecycle. Before inviting public users:
+
+1. scan one UPC-A and one EAN-13 package;
+2. verify the camera remains open after permission is granted;
+3. close the scanner and confirm the iPhone camera indicator turns off;
+4. compare generated nutrition with the physical label;
+5. test background/resume and **Start preview** recovery;
+6. test saved-food logging offline;
+7. export, reset, and import a backup with test data.
 
 ## Current limitations
 
-- Community product records can be incomplete or inaccurate; package-label verification remains necessary.
-- Physical camera autofocus and permission behavior remain device-dependent.
-- Local browser storage is not encrypted and is removed when Safari website data is cleared.
-- Multi-device synchronization, authentication, body photos, supplement scheduling, workout set/repetition progression, wearable integration, and AI coaching are not part of v1.6.2.
-- Apple Health requires a future native wrapper with HealthKit entitlements.
-- Fitness guidance is general information and is not medical advice.
+- Local browser storage is readable by anyone with access to the unlocked device/browser profile and can be erased with website data.
+- Open Food Facts availability and nutrition accuracy are external to PhactoryFit.
+- Multi-device sync, authentication, cloud storage, body photos, supplements, workout set/repetition progression, Apple Health, payments, and AI coaching are not implemented.
+- General fitness guidance is not medical advice.
 
-## Ownership
+## License and ownership
 
-Copyright © 2026 Tech Phactory Solutions LLC. All rights reserved.
-
-## iPhone deployment note
-
-Version 1.6.2 keeps every required runtime file at the repository root and embeds the barcode decoder in `index.html`. Upload every file from the GitHub-ready ZIP directly to the repository root.
+The PhactoryFit application is copyright © 2026 Tech Phactory Solutions LLC. The bundled ZXing component retains its separate open-source license in `ZXING_LICENSE.txt`.

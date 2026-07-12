@@ -1,0 +1,16 @@
+{
+  "generated_for": "PhactoryFit 1.7.0",
+  "runtime_vendor": {
+    "file": "zxing-browser.min.js",
+    "package": "@zxing/browser",
+    "version": "0.2.1",
+    "sha256": "066bc34edfcdd4a33f0964aeec967752a0dea1ccaf36e58e319ac9fcb5070f6a",
+    "license": "MIT",
+    "source_bundle_path": "node_modules/@zxing/browser/umd/zxing-browser.min.js"
+  },
+  "transitive_runtime_dependencies": [
+    {"package": "@zxing/library", "version": "0.23.0", "license": "Apache-2.0"},
+    {"package": "@zxing/text-encoding", "version": "0.9.0", "license": "Unlicense OR Apache-2.0"},
+    {"package": "ts-custom-error", "version": "3.3.1", "license": "MIT"}
+  ]
+}

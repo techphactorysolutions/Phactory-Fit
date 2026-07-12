@@ -1,12 +1,30 @@
 'use strict';
 
 const STORAGE_KEY = 'phactoryfit.v1';
-const APP_VERSION = '1.6.2';
+const APP_VERSION = '1.7.0';
 const MAX_LOG_ENTRIES_PER_DAY = 5000;
 const MAX_CUSTOM_FOODS = 10000;
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 const VALID_VIEWS = new Set(['today', 'diary', 'log', 'progress', 'coach', 'settings']);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_FOOD_SEARCH_LENGTH = 120;
+const MAX_API_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
+const MAX_BARCODE_PHOTO_BYTES = 10 * 1024 * 1024;
+const MAX_BARCODE_IMAGE_PIXELS = 40_000_000;
+const ALLOWED_API_ORIGINS = new Set([window.location.origin, 'https://world.openfoodfacts.org']);
+const ALLOWED_IMAGE_HOSTS = new Set(['images.openfoodfacts.org']);
+
+// GitHub Pages cannot add frame-ancestors/X-Frame-Options on normal project sites.
+// Refuse to run inside an iframe so an attacker cannot visually overlay the app.
+if (window.top !== window.self) {
+  document.body.replaceChildren();
+  const message = document.createElement('main');
+  message.setAttribute('role', 'alert');
+  message.textContent = 'PhactoryFit cannot run inside an embedded frame. Open it directly in a new tab.';
+  document.body.appendChild(message);
+  throw new Error('Blocked framed execution');
+}
 
 const starterFoods = [
   {id:'egg',name:'Large egg',brand:'Generic',serving:'1 egg',calories:72,protein:6.3,carbs:.4,fat:4.8,fiber:0,sugar:.2,sodium:71,aliases:['egg','eggs']},
@@ -54,9 +72,9 @@ function defaultState() {
   return {
     version: 2,
     selectedDate: today,
-    profile: {name:'Sean',currentWeight:202,goalWeight:175,calorieGoal:2300,proteinGoal:200,carbGoal:230,fatGoal:77,weeklyGoal:-1,eatBackExercise:false},
+    profile: {name:'Athlete',currentWeight:180,goalWeight:170,calorieGoal:2200,proteinGoal:160,carbGoal:220,fatGoal:73,weeklyGoal:-0.5,eatBackExercise:false},
     days: {[today]: emptyDay()},
-    weights: [{date:today,weight:202}],
+    weights: [{date:today,weight:180}],
     customFoods: [],
     recentFoodIds: [],
     createdAt: new Date().toISOString()
@@ -81,13 +99,13 @@ function uid(prefix = 'id') {
 
 function normalizeFood(raw, fallbackId = uid('food')) {
   if (!raw || typeof raw !== 'object') return null;
-  const name = String(raw.name || raw.product_name || '').trim();
+  const name = String(raw.name || raw.product_name || '').trim().slice(0, 200);
   if (!name) return null;
   return {
-    id: String(raw.id || fallbackId),
+    id: String(raw.id || fallbackId).slice(0, 200),
     name,
-    brand: String(raw.brand || raw.brands || 'Custom').trim() || 'Custom',
-    serving: String(raw.serving || raw.serving_size || '1 serving').trim() || '1 serving',
+    brand: (String(raw.brand || raw.brands || 'Custom').trim().slice(0, 200) || 'Custom'),
+    serving: (String(raw.serving || raw.serving_size || '1 serving').trim().slice(0, 200) || '1 serving'),
     calories: round(toNumber(raw.calories, 0, 0, 100000), 4),
     protein: round(toNumber(raw.protein, 0, 0, 10000), 4),
     carbs: round(toNumber(raw.carbs, 0, 0, 10000), 4),
@@ -100,7 +118,7 @@ function normalizeFood(raw, fallbackId = uid('food')) {
     sodium: round(toNumber(raw.sodium, 0, 0, 1000000), 4),
     aliases: Array.isArray(raw.aliases) ? raw.aliases.map(alias => String(alias).toLowerCase()).filter(Boolean).slice(0, 30) : [],
     barcode: raw.barcode ? String(raw.barcode).replace(/\D/g, '').slice(0, 14) : null,
-    source: raw.source ? String(raw.source) : undefined,
+    source: raw.source ? String(raw.source).slice(0, 80) : undefined,
     imageUrl: sanitizeImageUrl(raw.imageUrl || raw.image_front_small_url || raw.image_small_url || '')
   };
 }
@@ -112,7 +130,7 @@ function normalizeLogEntry(raw) {
     ...food,
     meal: MEALS.includes(raw.meal) ? raw.meal : 'Breakfast',
     quantity: toNumber(raw.quantity, 1, 0.01, 1000),
-    logId: String(raw.logId || uid('log'))
+    logId: String(raw.logId || uid('log')).slice(0, 200)
   };
 }
 
@@ -190,8 +208,8 @@ function normalizeState(raw) {
     days,
     weights,
     customFoods,
-    recentFoodIds: Array.isArray(source.recentFoodIds) ? [...new Set(source.recentFoodIds.map(String))].slice(0, 12) : [],
-    createdAt: typeof source.createdAt === 'string' ? source.createdAt : base.createdAt
+    recentFoodIds: Array.isArray(source.recentFoodIds) ? [...new Set(source.recentFoodIds.map(value => String(value).slice(0, 200)))].slice(0, 12) : [],
+    createdAt: typeof source.createdAt === 'string' && !Number.isNaN(Date.parse(source.createdAt)) ? source.createdAt.slice(0, 40) : base.createdAt
   };
 }
 
@@ -292,10 +310,42 @@ function escapeHtml(value = '') {
 function sanitizeImageUrl(value = '') {
   try {
     const url = new URL(String(value || ''), window.location.href);
-    return url.protocol === 'https:' ? url.href.slice(0, 2000) : '';
+    if (url.protocol !== 'https:' || url.username || url.password || !ALLOWED_IMAGE_HOSTS.has(url.hostname)) return '';
+    url.hash = '';
+    return url.href.slice(0, 2000);
   } catch {
     return '';
   }
+}
+
+function safeApiUrl(value) {
+  try {
+    const url = new URL(String(value || ''), window.location.href);
+    if (url.username || url.password || url.protocol !== 'https:' || !ALLOWED_API_ORIGINS.has(url.origin)) return null;
+    url.hash = '';
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function configuredProxyUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const url = safeApiUrl(raw);
+  if (!url) {
+    console.warn('Ignored an unsafe food-data proxy URL. Use same-origin HTTPS or add the trusted origin to the CSP and allowlist.');
+    return '';
+  }
+  return url.href;
+}
+
+async function readBoundedJson(response, maxBytes = MAX_API_RESPONSE_BYTES) {
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) throw new Error('API response exceeded the safe size limit');
+  const text = await response.text();
+  if (new TextEncoder().encode(text).byteLength > maxBytes) throw new Error('API response exceeded the safe size limit');
+  return JSON.parse(text);
 }
 
 function totalsFor(date = state.selectedDate) {
@@ -693,7 +743,7 @@ function mealOptions(selected) {
 }
 
 function foodModal(meal) {
-  return `<div class="modal-form"><label>Meal<select id="foodMeal">${mealOptions(meal)}</select></label><label>Search foods or brands<input id="foodSearch" type="search" placeholder="Doritos, Pepsi, Coke, chicken…" autocomplete="off" enterkeyhint="search" spellcheck="false"></label><p class="form-note food-search-help">Saved foods appear instantly. Brand and packaged-food results are searched online after you pause typing.</p><div class="inline-actions"><button type="button" class="secondary-button" id="createFoodButton">Create custom food</button></div><div id="foodResults" class="search-results" aria-live="polite"></div></div>`;
+  return `<div class="modal-form"><label>Meal<select id="foodMeal">${mealOptions(meal)}</select></label><label>Search foods or brands<input id="foodSearch" type="search" maxlength="120" placeholder="Doritos, Pepsi, Coke, chicken…" autocomplete="off" enterkeyhint="search" spellcheck="false"></label><p class="form-note food-search-help">Saved foods appear instantly. Brand and packaged-food results are searched online after you pause typing.</p><div class="inline-actions"><button type="button" class="secondary-button" id="createFoodButton">Create custom food</button></div><div id="foodResults" class="search-results" aria-live="polite"></div></div>`;
 }
 
 function barcodeModal(meal) {
@@ -723,7 +773,7 @@ function dateModal() {
 }
 
 function foodSearchResultButton(food, online = false) {
-  const image = food.imageUrl ? `<img src="${escapeHtml(food.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '';
+  const image = food.imageUrl ? `<img src="${escapeHtml(food.imageUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '';
   return `<button type="button" class="search-result${online ? ' online-food-result' : ''}" data-food-id="${escapeHtml(food.id)}">${image}<span class="search-result-copy"><strong>${escapeHtml(food.name)}</strong><small>${escapeHtml(food.brand)} · ${escapeHtml(food.serving)} · ${round(food.calories)} kcal · ${round(food.protein, 1)}g protein</small></span></button>`;
 }
 
@@ -791,12 +841,12 @@ function rememberFoodSearch(query, foods) {
 }
 
 async function fetchOnlineFoodSearch(query) {
-  const normalized = String(query || '').trim();
+  const normalized = String(query || '').trim().slice(0, MAX_FOOD_SEARCH_LENGTH);
   if (normalized.length < 2) return [];
   const cached = onlineFoodSearchCache.get(normalized.toLowerCase());
   if (cached) return cached;
   const fields = 'code,product_name,brands,serving_size,serving_quantity,quantity,nutriments,image_front_small_url,image_small_url,popularity_key';
-  const proxy = window.PHACTORYFIT_CONFIG?.offSearchProxyUrl?.trim();
+  const proxy = configuredProxyUrl(window.PHACTORYFIT_CONFIG?.offSearchProxyUrl);
   const urls = [];
   if (proxy) urls.push(`${proxy}${proxy.includes('?') ? '&' : '?'}q=${encodeURIComponent(normalized)}`);
   urls.push(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(normalized)}&search_simple=1&action=process&json=1&page=1&page_size=24&sort_by=unique_scans_n&fields=${encodeURIComponent(fields)}&app_name=PhactoryFit&app_version=${encodeURIComponent(APP_VERSION)}`);
@@ -808,7 +858,7 @@ async function fetchOnlineFoodSearch(query) {
     try {
       const response = await fetchWithTimeout(url, 14000);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      const data = await readBoundedJson(response);
       const products = Array.isArray(data?.products) ? data.products : Array.isArray(data?.hits) ? data.hits.map(hit => hit._source || hit) : [];
       const seen = new Set();
       const foods = products.filter(product => product && productHasNutrition(product)).map(product => {
@@ -832,7 +882,7 @@ async function fetchOnlineFoodSearch(query) {
 }
 
 async function runOnlineFoodSearch(query, force = false) {
-  const normalized = String(query || '').trim().toLowerCase();
+  const normalized = String(query || '').trim().slice(0, MAX_FOOD_SEARCH_LENGTH).toLowerCase();
   const currentInput = $('#foodSearch');
   if (!currentInput || String(currentInput.value || '').trim().toLowerCase() !== normalized) return;
   if (normalized.length < 2) {
@@ -868,7 +918,7 @@ async function runOnlineFoodSearch(query, force = false) {
 function scheduleOnlineFoodSearch(query) {
   if (foodSearchTimer) clearTimeout(foodSearchTimer);
   foodSearchRequest += 1;
-  const normalized = String(query || '').trim();
+  const normalized = String(query || '').trim().slice(0, MAX_FOOD_SEARCH_LENGTH);
   onlineFoodResults = [];
   onlineFoodQuery = normalized.toLowerCase();
   onlineFoodLoading = normalized.length >= 2;
@@ -906,11 +956,23 @@ function showCustomFoodForm(barcode = '', meal = modalContext.meal, presetFood =
   $('#modalContent').innerHTML = `<form id="customFoodForm" class="modal-form">${barcode ? `<p class="form-note">This food will be linked to barcode ${escapeHtml(barcode)} for future scans.</p>` : ''}${preset ? '<p class="form-note">Correct any value that does not match the package label. Your corrected version will replace the community result on this device.</p>' : ''}<input name="barcode" type="hidden" value="${escapeHtml(barcode)}"><input name="meal" type="hidden" value="${selectedMeal}"><input name="replaceFoodId" type="hidden" value="${escapeHtml(preset?.id || '')}"><label>Food name<input name="name" maxlength="200" value="${value('name')}" required></label><label>Brand<input name="brand" maxlength="200" value="${value('brand','Custom')}"></label><label>Serving description<input name="serving" maxlength="200" value="${value('serving')}" placeholder="1 serving, 100 g, 1 cup" required></label><div class="two-col"><label>Calories<input name="calories" type="number" step="any" min="0" max="100000" value="${value('calories')}" required></label><label>Protein (g)<input name="protein" type="number" step="any" min="0" max="10000" value="${value('protein')}" required></label></div><div class="two-col"><label>Carbs (g)<input name="carbs" type="number" step="any" min="0" max="10000" value="${value('carbs',0)}" required></label><label>Fat (g)<input name="fat" type="number" step="any" min="0" max="10000" value="${value('fat',0)}" required></label></div><div class="two-col"><label>Fiber (g)<input name="fiber" type="number" step="any" min="0" max="10000" value="${value('fiber',0)}"></label><label>Sugar (g)<input name="sugar" type="number" step="any" min="0" max="10000" value="${value('sugar',0)}"></label></div><div class="two-col"><label>Saturated fat (g)<input name="saturatedFat" type="number" step="any" min="0" max="10000" value="${value('saturatedFat',0)}"></label><label>Trans fat (g)<input name="transFat" type="number" step="any" min="0" max="10000" value="${value('transFat',0)}"></label></div><div class="two-col"><label>Cholesterol (mg)<input name="cholesterol" type="number" step="any" min="0" max="1000000" value="${value('cholesterol',0)}"></label><label>Sodium (mg)<input name="sodium" type="number" step="any" min="0" max="1000000" value="${value('sodium',0)}"></label></div><button class="primary-button" type="submit">${preset ? 'Save corrected nutrition' : 'Save food'}</button></form>`;
 }
 
-async function fetchWithTimeout(url, timeoutMs = 10000) {
+async function fetchWithTimeout(value, timeoutMs = 10000) {
+  const url = safeApiUrl(value);
+  if (!url) throw new Error('Blocked an untrusted API destination');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, {signal:controller.signal,headers:{Accept:'application/json'}});
+    const response = await fetch(url.href, {
+      signal:controller.signal,
+      headers:{Accept:'application/json'},
+      credentials:'omit',
+      referrerPolicy:'no-referrer',
+      cache:'no-store',
+      mode:url.origin === window.location.origin ? 'same-origin' : 'cors'
+    });
+    const finalUrl = safeApiUrl(response.url || url.href);
+    if (!finalUrl) throw new Error('Blocked an unexpected API redirect');
+    return response;
   } finally {
     clearTimeout(timer);
   }
@@ -1055,7 +1117,7 @@ function barcodeDatabaseCodes(code) {
 }
 
 async function fetchBarcodeProduct(code) {
-  const proxy = window.PHACTORYFIT_CONFIG?.offProxyUrl?.trim();
+  const proxy = configuredProxyUrl(window.PHACTORYFIT_CONFIG?.offProxyUrl);
   const fields = 'code,status,status_verbose,product_name,brands,serving_size,serving_quantity,quantity,nutrition_data_per,nutriments';
   let lastError = null;
   let reachedDatabase = false;
@@ -1068,7 +1130,7 @@ async function fetchBarcodeProduct(code) {
         const response = await fetchWithTimeout(url, 12000);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         reachedDatabase = true;
-        const data = await response.json();
+        const data = await readBoundedJson(response);
         if (data?.status === 0) continue;
         const product = data?.product || data;
         if (!product || (!product.product_name && !product.name)) continue;
@@ -1129,7 +1191,7 @@ function barcodeCameraErrorMessage(error) {
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'The camera is busy or unavailable. Close other camera apps, return to PhactoryFit, and try again.';
   if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The requested rear-camera mode was unavailable. PhactoryFit will retry with simpler camera settings.';
-  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.6.2 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
+  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.7.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
   if (name === 'TimeoutError') return 'No barcode was detected. Hold the package 6–10 inches away, avoid glare, and keep the entire barcode inside the frame.';
   return 'The barcode camera could not start. Check camera permission, lighting, and the secure HTTPS address, then try again.';
 }
@@ -1142,13 +1204,18 @@ function barcodeScannerLibraryReady() {
 
 function loadBarcodeScannerScript(source, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
+    const url = new URL(String(source || ''), document.baseURI);
+    if (url.origin !== window.location.origin || !/\/zxing-browser\.min\.js$/.test(url.pathname)) {
+      reject(new Error('Blocked an untrusted scanner script source'));
+      return;
+    }
     const script = document.createElement('script');
     const timer = setTimeout(() => {
       script.remove();
       reject(new DOMException('Scanner engine load timed out', 'TimeoutError'));
     }, timeoutMs);
     script.async = true;
-    script.src = source;
+    script.src = url.href;
     script.dataset.phactoryScannerRetry = 'true';
     script.onload = () => {
       clearTimeout(timer);
@@ -1171,8 +1238,7 @@ async function ensureBarcodeScannerLibrary() {
   barcodeLibraryLoadPromise = (async () => {
     const retryToken = Date.now();
     const candidates = [
-      new URL(`zxing-browser.min.js?v=${encodeURIComponent(APP_VERSION)}&retry=${retryToken}`, document.baseURI).href,
-      new URL(`vendor/zxing-browser.min.js?v=${encodeURIComponent(APP_VERSION)}&retry=${retryToken}`, document.baseURI).href
+      new URL(`zxing-browser.min.js?v=${encodeURIComponent(APP_VERSION)}&retry=${retryToken}`, document.baseURI).href
     ];
     let lastError = null;
     for (const source of candidates) {
@@ -1432,7 +1498,7 @@ async function switchBarcodeCamera() {
 async function scanBarcodePhoto(file) {
   const result = $('#barcodeResult');
   if (!result || !file) return;
-  if (file.size > 25 * 1024 * 1024) {
+  if (file.size > MAX_BARCODE_PHOTO_BYTES) {
     result.innerHTML = '<p class="form-note">That image is too large. Take a closer barcode photo and try again.</p>';
     return;
   }
@@ -1472,6 +1538,7 @@ async function scanBarcodePhoto(file) {
       const canvas = scannerCanvas('barcodePhotoCanvas');
       const width = image.naturalWidth || image.width;
       const height = image.naturalHeight || image.height;
+      if (!width || !height || width * height > MAX_BARCODE_IMAGE_PIXELS) throw new DOMException('Image dimensions exceed the safe limit', 'DataError');
       const attempts = [
         [0, 0, width, height, false],
         [width * .03, height * .25, width * .94, height * .5, false],
@@ -1769,6 +1836,14 @@ async function startBarcodeCamera(forceStart = false) {
 }
 
 function startVoiceLog() {
+  const voiceNoticeKey = 'phactoryfit.voiceNotice.v1';
+  let voiceNoticeAccepted = false;
+  try { voiceNoticeAccepted = localStorage.getItem(voiceNoticeKey) === 'accepted'; } catch {}
+  if (!voiceNoticeAccepted) {
+    const accepted = confirm('Safari provides voice recognition and may send audio to Apple for online speech processing. Continue?');
+    if (!accepted) return;
+    try { localStorage.setItem(voiceNoticeKey, 'accepted'); } catch {}
+  }
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) {
     toast('Voice recognition is not supported in this browser.');
@@ -1825,7 +1900,8 @@ function exportData() {
 
 async function importData(file) {
   try {
-    if (!file || file.size > 20 * 1024 * 1024) throw new Error('Backup is missing or too large');
+    if (!file || file.size > MAX_BACKUP_BYTES) throw new Error('Backup is missing or too large');
+    if (file.type && !['application/json','text/json','text/plain'].includes(file.type) && !/\.json$/i.test(file.name || '')) throw new Error('Backup must be JSON');
     const parsed = JSON.parse(await file.text());
     if (!parsed || typeof parsed !== 'object' || !parsed.profile || !parsed.days) throw new Error('Invalid backup');
     state = normalizeState(parsed);
@@ -2137,6 +2213,5 @@ window.addEventListener('resize', () => {
   if ($('.view[data-view="progress"]').classList.contains('active')) renderProgress();
 });
 
-window.__PHACTORYFIT_CAMERA_DIAGNOSTICS = () => ({version:APP_VERSION, permissionInFlight:cameraPermissionInFlight, streamActive:Boolean(activeMediaStream), trackState:activeMediaStream?.getVideoTracks?.()[0]?.readyState || 'none', lifecycleNote:cameraLifecycleNote, session:barcodeScanSession});
 registerServiceWorker();
 render();

@@ -34,3 +34,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.file-label:focus-
 button,.file-label{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .search-result:focus-visible,.habit:focus-visible,.action-card:focus-visible,.rescue-item:focus-visible{border-color:var(--accent-dark)}
 @media(prefers-reduced-motion:reduce){.view{animation:none}.progress span,#toast{transition:none}}
+
+/* Security/privacy disclosure */
+.privacy-details{margin:14px 0 18px;border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:var(--surface-soft,#f7f8fa)}
+.privacy-details summary{cursor:pointer;font-weight:800;color:var(--ink,#111827);min-height:44px;display:flex;align-items:center}
+.privacy-details p{margin:10px 0 0;line-height:1.55;color:var(--muted,#6b7280)}
+.privacy-details a{color:var(--accent,#0879e8);font-weight:700}
+.privacy-details code{overflow-wrap:anywhere}

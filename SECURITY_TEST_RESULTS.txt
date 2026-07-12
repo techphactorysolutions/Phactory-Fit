@@ -1,0 +1,6 @@
+PASS test_imported_xss_is_rendered_as_text
+PASS test_malicious_api_fields_do_not_execute_or_track
+PASS test_url_allowlists_and_bounded_json
+PASS test_query_and_import_limits
+PASS test_frame_guard
+PASSED 5/5 browser security tests

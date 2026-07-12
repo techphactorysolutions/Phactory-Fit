@@ -1,5 +1,44 @@
 # Changelog
 
+## v1.7.0 — July 12, 2026
+
+### Public security hardening
+
+- Added a restrictive Content Security Policy with no `unsafe-inline` or `unsafe-eval`.
+- Removed the embedded inline scanner bundle and restored a same-origin external scanner file.
+- Restricted executable scripts to the application origin.
+- Restricted API traffic to same-origin HTTPS and Open Food Facts.
+- Restricted remote product images to the official Open Food Facts image host.
+- Added redirect validation, credential omission, no-referrer requests, and no-store API behavior.
+- Added response, backup, photo, image-pixel, query, field, and record-count limits.
+- Reworked service-worker caching around an explicit shell allowlist and canonical cache keys.
+- Added an anti-framing runtime guard.
+- Added first-use Safari voice-processing disclosure and detailed privacy UI.
+- Replaced developer-specific first-run profile data with generic defaults.
+- Removed production camera diagnostics.
+- Corrected the generic profile's initial weight-history value.
+
+### Supply-chain and repository controls
+
+- Pinned `@zxing/browser` 0.2.1 and transitive versions in `package-lock.json`.
+- Added `VENDOR_LOCK.json` with the exact scanner SHA-256.
+- Added GitHub Actions static, syntax, dependency, and vendored-file verification.
+- Added Dependabot configuration for npm and GitHub Actions.
+- Added best-effort secret scanning to the static audit.
+
+### Documentation
+
+- Added `SECURITY.md`, `PRIVACY.md`, and `THREAT_MODEL.md`.
+- Replaced the release audit with a public security assessment and residual-risk report.
+- Added reproducible runtime and static security test suites.
+
+### Validation
+
+- 17/17 full browser and calculation regressions passed.
+- 5/5 malicious-input and runtime security browser tests passed.
+- Exact static check count and npm audit results are recorded in the release result files.
+- Physical iPhone camera and deployed-origin validation remain required release gates.
+
 ## v1.6.2 — iPhone Safari camera lifecycle repair
 
 - Removed `pagehide` camera teardown because iPhone Safari can emit that lifecycle event while presenting or dismissing the camera permission UI.

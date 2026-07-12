@@ -1,16 +1,82 @@
-PhactoryFit v1.6.2 static and deployment audit
+PASS: required file: index.html
+PASS: required file: styles.css
+PASS: required file: app.js
+PASS: required file: config.js
+PASS: required file: service-worker.js
+PASS: required file: manifest.webmanifest
+PASS: required file: zxing-browser.min.js
+PASS: required file: PRIVACY.md
+PASS: required file: SECURITY.md
+PASS: required file: THREAT_MODEL.md
+PASS: required file: VENDOR_LOCK.json
+PASS: required file: package.json
+PASS: required file: package-lock.json
+PASS: version 1.7.0 in index.html
+PASS: version 1.7.0 in app.js
+PASS: version 1.7.0 in service-worker.js
+PASS: version 1.7.0 in package.json
+PASS: manifest start_url is relative
+PASS: manifest scope is relative
+PASS: manifest standalone display
+PASS: CSP is present
+PASS: CSP directive: default-src 'self'
+PASS: CSP directive: base-uri 'none'
+PASS: CSP directive: object-src 'none'
+PASS: CSP directive: script-src 'self'
+PASS: CSP directive: style-src 'self'
+PASS: CSP directive: connect-src 'self' https://world.openfoodfacts.org
+PASS: CSP directive: form-action 'self'
+PASS: CSP directive: frame-src 'none'
+PASS: CSP directive: upgrade-insecure-requests
+PASS: CSP directive: block-all-mixed-content
+PASS: CSP has no unsafe-inline
+PASS: CSP has no unsafe-eval
+PASS: no inline executable script tags
+PASS: no inline event handlers
+PASS: referrer policy is no-referrer
+PASS: anti-framing guard present
+PASS: external links use noopener
+PASS: all scripts are same-origin relative
+PASS: no eval
+PASS: no new Function
+PASS: no document.write
+PASS: no javascript URL
+PASS: strict mode in app
+PASS: strict mode in service worker
+PASS: configuration object frozen
+PASS: security control present: MAX_FOOD_SEARCH_LENGTH
+PASS: security control present: MAX_API_RESPONSE_BYTES
+PASS: security control present: MAX_BACKUP_BYTES
+PASS: security control present: MAX_BARCODE_PHOTO_BYTES
+PASS: security control present: MAX_BARCODE_IMAGE_PIXELS
+PASS: security control present: ALLOWED_API_ORIGINS
+PASS: security control present: ALLOWED_IMAGE_HOSTS
+PASS: security control present: credentials:'omit'
+PASS: security control present: referrerPolicy:'no-referrer'
+PASS: API response reads are bounded
+PASS: backup imports are bounded
+PASS: barcode images are bounded
+PASS: remote images use host allowlist
+PASS: API calls use origin allowlist
+PASS: HTML escaping helper exists
+PASS: default user profile is generic
+PASS: production diagnostics global removed
+PASS: service-worker control present: CACHEABLE_PATHS
+PASS: service-worker control present: canonicalCacheKey
+PASS: service-worker control present: requestUrl.origin !== self.location.origin
+PASS: service-worker control present: response.type !== 'basic'
+PASS: service worker does not cache unknown same-origin responses
+PASS: service worker does not cache cross-origin API responses
+PASS: scanner is in required offline shell
+PASS: ZXing bundle SHA-256 matches audited upstream
+PASS: vendor lock hash matches file
+PASS: ZXing version pinned exactly
+PASS: package lock version matches
+PASS: package lock uses public registry
+PASS: no detected private key
+PASS: no detected GitHub token
+PASS: no detected AWS access key
+PASS: no detected Google API key
+PASS: no detected generic hard-coded secret
 
-Deployment package audit: 61/61 passed
-Full source audit: 83/83 passed
-
-Validated:
-- JavaScript syntax
-- Versioned app and stylesheet references
-- Embedded and root recovery barcode decoder
-- Permission-safe camera lifecycle cleanup
-- iPhone inline-video support
-- Service-worker cache version and update behavior
-- Manifest and icon files
-- Required runtime references
-- ZXing license
-- Credential/private-key scan
+RESULT: 80/80 checks passed
