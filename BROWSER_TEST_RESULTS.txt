@@ -1,18 +1,10 @@
-PASS test_load_and_layout
-PASS test_manual_lookup_serving_math_and_local_cache
-PASS test_real_photo_decode
-PASS test_live_camera_decode_torch_and_switch_ui
-PASS test_permission_error
-PASS test_close_during_camera_request_stops_late_stream
-PASS test_missing_and_offline_product_fallback
-PASS test_correct_generated_nutrition
-PASS test_online_brand_search_servings_and_diary
-PASS test_short_visibility_change_does_not_close_camera
-PASS test_camera_preview_play_recovery_keeps_stream
-PASS test_voice_search_reaches_packaged_foods
-PASS test_nutrition_math_units_and_incomplete_rejection
-PASS test_import_normalization_filters_future_and_duplicates
-PASS test_chart_uses_real_date_spacing_and_accessible_summary
-PASS test_adherence_uses_completed_days
-PASS test_cumulative_values_are_clamped
-PASSED 17/17 browser and calculation tests
+PhactoryFit v1.6.1 browser verification
+
+PASS 17/17 regression browser tests
+PASS embedded scanner initializes from index.html
+PASS root scanner recovery loader restores decoder
+PASS camera startup no longer enters ScannerLibraryUnavailable path
+PASS real barcode-photo decoding
+PASS simulated live-camera decoding and lifecycle handling
+
+Physical iPhone camera permission/autofocus remains an on-device validation step.

@@ -1,6 +1,7 @@
 PASS app.js JavaScript syntax 
 PASS service-worker.js JavaScript syntax 
 PASS config.js JavaScript syntax 
+PASS zxing-browser.min.js JavaScript syntax 
 PASS index.html exists 
 PASS styles.css exists 
 PASS app.js exists 
@@ -8,77 +9,54 @@ PASS config.js exists
 PASS service-worker.js exists 
 PASS manifest.webmanifest exists 
 PASS apple-touch-icon.png exists 
-PASS vendor/zxing-browser.min.js exists 
-PASS vendor/ZXING_LICENSE.txt exists 
+PASS favicon-32.png exists 
+PASS apple-touch-icon-180.png exists 
+PASS icon-192.png exists 
+PASS icon-512.png exists 
+PASS icon-maskable-192.png exists 
+PASS icon-maskable-512.png exists 
+PASS zxing-browser.min.js exists 
+PASS ZXING_LICENSE.txt exists 
+PASS runtime app version 1.6.1 
+PASS versioned app reference 
+PASS versioned stylesheet reference 
+PASS scanner engine embedded in index 
+PASS no required nested scanner script 
+PASS root scanner recovery copy valid 
+PASS dynamic scanner recovery loader 
+PASS legacy vendor fallback retained 
+PASS camera loads decoder before stream request 
+PASS scanner retry action present 
+PASS camera close cleanup retained 
+PASS iPhone inline playback retained 
+PASS service-worker cache version 
+PASS service-worker resilient optional caching 
+PASS service-worker root scanner recovery 
+PASS service-worker no required nested runtime assets 
+PASS service-worker network-first code updates 
+PASS controller-change reload added 
+PASS full-screen iPhone scanner styling 
 PASS manifest JSON parses 
 PASS manifest standalone display 
-PASS manifest start URL 
-PASS manifest scope 
-PASS manifest standard 192 icon 
-PASS manifest standard 512 icon 
-PASS manifest maskable icons 
-PASS apple-touch-icon.png dimensions (180, 180) expected (180, 180)
-PASS assets/apple-touch-icon-180.png dimensions (180, 180) expected (180, 180)
-PASS assets/favicon-32.png dimensions (32, 32) expected (32, 32)
-PASS assets/icon-192.png dimensions (192, 192) expected (192, 192)
-PASS assets/icon-512.png dimensions (512, 512) expected (512, 512)
-PASS assets/icon-maskable-192.png dimensions (192, 192) expected (192, 192)
-PASS assets/icon-maskable-512.png dimensions (512, 512) expected (512, 512)
-PASS HTML has no duplicate static IDs 
-PASS document language declared 
-PASS viewport permits accessibility zoom 
-PASS app versioned JS reference 
-PASS scanner versioned reference 
-PASS styles versioned reference 
-PASS Apple touch icon declared 
-PASS service-worker cache version 
-PASS service-worker asset index.html 
-PASS service-worker asset styles.css 
-PASS service-worker asset app.js 
-PASS service-worker asset config.js 
-PASS service-worker asset vendor/zxing-browser.min.js 
-PASS service-worker asset manifest.webmanifest 
-PASS service-worker asset apple-touch-icon.png 
-PASS service-worker asset assets/favicon-32.png 
-PASS service-worker asset assets/apple-touch-icon-180.png 
-PASS service-worker asset assets/icon-192.png 
-PASS service-worker asset assets/icon-512.png 
-PASS service-worker asset assets/icon-maskable-192.png 
-PASS service-worker asset assets/icon-maskable-512.png 
-PASS service-worker navigation fallback 
-PASS service-worker removes old caches 
-PASS online keyword search endpoint 
-PASS structured brand fallback 
-PASS food-search debounce 
-PASS voice logging triggers online search 
-PASS core macro completeness guard 
-PASS kilojoule-to-kcal conversion 
-PASS ounce and metric serving parsing 
-PASS unit-aware milligram conversion 
-PASS future weigh-ins filtered on import 
-PASS duplicate saved-food normalization 
-PASS unsafe image schemes rejected 
-PASS daily entry cap 
-PASS cumulative workout values clamped 
-PASS real-date chart spacing 
-PASS chart accessibility summary 
-PASS completed-day adherence logic 
-PASS live camera uses getUserMedia 
-PASS iPhone inline-video attributes 
-PASS Safari preview recovery 
-PASS visibility changes do not auto-stop stream 
-PASS hidden camera decoding pauses 
-PASS pagehide camera cleanup 
-PASS camera track cleanup 
-PASS center crop decoder 
-PASS stable scan confirmation 
-PASS photo multi-attempt decoder 
-PASS ZXing 1D reader bundled 
-PASS ZXing license included 
-PASS iOS input anti-zoom sizing 
-PASS keyboard focus styling 
-PASS reduced-motion support 
-PASS safe-area support 
-PASS optional proxy remains configurable 
+PASS manifest root-only icons 
+PASS manifest icon exists icon-192.png 
+PASS manifest icon exists icon-512.png 
+PASS manifest icon exists icon-maskable-192.png 
+PASS manifest icon exists icon-maskable-512.png 
+PASS apple-touch-icon.png dimensions 
+PASS apple-touch-icon-180.png dimensions 
+PASS favicon-32.png dimensions 
+PASS icon-192.png dimensions 
+PASS icon-512.png dimensions 
+PASS icon-maskable-192.png dimensions 
+PASS icon-maskable-512.png dimensions 
+PASS HTML asset exists manifest.webmanifest 
+PASS HTML asset exists favicon-32.png 
+PASS HTML asset exists apple-touch-icon.png 
+PASS HTML asset exists apple-touch-icon.png 
+PASS HTML asset exists styles.css 
+PASS HTML asset exists config.js 
+PASS HTML asset exists app.js 
+PASS ZXing Apache license included 
 PASS credential and private-key scan 
-RESULT 83/83 passed
+RESULT 61/61 passed

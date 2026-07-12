@@ -1,7 +1,7 @@
 'use strict';
 
 const STORAGE_KEY = 'phactoryfit.v1';
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 const MAX_LOG_ENTRIES_PER_DAY = 5000;
 const MAX_CUSTOM_FOODS = 10000;
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -231,6 +231,7 @@ let foodSearchRequest = 0;
 const onlineFoodSearchCache = new Map();
 let cameraVisibilityTimer = null;
 let barcodeDecodeRunning = false;
+let barcodeLibraryLoadPromise = null;
 
 function saveState() {
   try {
@@ -1125,9 +1126,71 @@ function barcodeCameraErrorMessage(error) {
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'The camera is busy or unavailable. Close other camera apps, return to PhactoryFit, and try again.';
   if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The requested rear-camera mode was unavailable. PhactoryFit will retry with simpler camera settings.';
-  if (name === 'ScannerLibraryUnavailable') return 'The bundled barcode scanner did not load. Refresh PhactoryFit once while online, then reopen the scanner.';
+  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.6.1 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
   if (name === 'TimeoutError') return 'No barcode was detected. Hold the package 6–10 inches away, avoid glare, and keep the entire barcode inside the frame.';
   return 'The barcode camera could not start. Check camera permission, lighting, and the secure HTTPS address, then try again.';
+}
+
+
+function barcodeScannerLibraryReady() {
+  const api = window.ZXingBrowser;
+  return Boolean(api && (api.BrowserMultiFormatOneDReader || api.BrowserMultiFormatReader));
+}
+
+function loadBarcodeScannerScript(source, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      script.remove();
+      reject(new DOMException('Scanner engine load timed out', 'TimeoutError'));
+    }, timeoutMs);
+    script.async = true;
+    script.src = source;
+    script.dataset.phactoryScannerRetry = 'true';
+    script.onload = () => {
+      clearTimeout(timer);
+      if (barcodeScannerLibraryReady()) resolve(window.ZXingBrowser);
+      else reject(new Error('Scanner script loaded without exposing the decoder API'));
+    };
+    script.onerror = () => {
+      clearTimeout(timer);
+      script.remove();
+      reject(new Error(`Could not load scanner engine from ${source}`));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureBarcodeScannerLibrary() {
+  if (barcodeScannerLibraryReady()) return window.ZXingBrowser;
+  if (barcodeLibraryLoadPromise) return barcodeLibraryLoadPromise;
+
+  barcodeLibraryLoadPromise = (async () => {
+    const retryToken = Date.now();
+    const candidates = [
+      new URL(`zxing-browser.min.js?v=${encodeURIComponent(APP_VERSION)}&retry=${retryToken}`, document.baseURI).href,
+      new URL(`vendor/zxing-browser.min.js?v=${encodeURIComponent(APP_VERSION)}&retry=${retryToken}`, document.baseURI).href
+    ];
+    let lastError = null;
+    for (const source of candidates) {
+      try {
+        await loadBarcodeScannerScript(source);
+        if (barcodeScannerLibraryReady()) return window.ZXingBrowser;
+      } catch (error) {
+        lastError = error;
+        console.warn('Barcode scanner engine candidate failed', source, error);
+      }
+    }
+    const error = new Error(lastError?.message || 'Barcode scanner engine unavailable');
+    error.name = 'ScannerLibraryUnavailable';
+    throw error;
+  })();
+
+  try {
+    return await barcodeLibraryLoadPromise;
+  } finally {
+    if (!barcodeScannerLibraryReady()) barcodeLibraryLoadPromise = null;
+  }
 }
 
 function normalizeScannedBarcode(value) {
@@ -1371,6 +1434,7 @@ async function scanBarcodePhoto(file) {
     }
 
     if (!rawValue) {
+      await ensureBarcodeScannerLibrary();
       const reader = barcodeReaderInstance();
       const canvas = scannerCanvas('barcodePhotoCanvas');
       const width = image.naturalWidth || image.width;
@@ -1558,13 +1622,20 @@ async function startBarcodeCamera(forceStart = false) {
   const session = barcodeScanSession;
   barcodeCameraStarting = true;
   barcodeCandidate = {code:'',seenAt:0,count:0};
-  shell.hidden = false;
-  setBarcodeCameraMode(true);
-  shell.scrollIntoView?.({block:'center',behavior:'instant'});
   setBarcodeCameraButton(true);
-  result.innerHTML = '<p class="form-note camera-status">Requesting rear-camera access…</p>';
+  result.innerHTML = '<p class="form-note camera-status">Loading barcode scanner engine…</p>';
 
   try {
+    // The scanner is bundled inline in v1.6.1, but this also retries the root
+    // copy if Safari loaded an older cached page or the first script load failed.
+    await ensureBarcodeScannerLibrary();
+    if (session !== barcodeScanSession || !modal.open) return;
+
+    shell.hidden = false;
+    setBarcodeCameraMode(true);
+    shell.scrollIntoView?.({block:'center',behavior:'instant'});
+    result.innerHTML = '<p class="form-note camera-status">Requesting rear-camera access…</p>';
+
     const requestedStream = await requestBarcodeStream(preferredBarcodeDeviceId);
     if (session !== barcodeScanSession || !modal.open) {
       requestedStream?.getTracks?.().forEach(track => track.stop());
@@ -1591,7 +1662,12 @@ async function startBarcodeCamera(forceStart = false) {
     console.warn('Camera barcode scan failed', error);
     stopBarcodeCamera();
     const currentResult = $('#barcodeResult');
-    if (currentResult) currentResult.innerHTML = `<p class="form-note">${escapeHtml(barcodeCameraErrorMessage(error))}</p>`;
+    if (currentResult) {
+      const retry = String(error?.name || '') === 'ScannerLibraryUnavailable'
+        ? '<button type="button" id="retryBarcodeCamera" class="secondary-button">Retry scanner engine</button>'
+        : '';
+      currentResult.innerHTML = `<p class="form-note">${escapeHtml(barcodeCameraErrorMessage(error))}</p>${retry}`;
+    }
   } finally {
     barcodeCameraStarting = false;
     if (!activeMediaStream && !activeBarcodeControls) setBarcodeCameraButton(false);
@@ -1672,7 +1748,15 @@ async function importData(file) {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('./service-worker.js').then(registration => registration.update()).catch(error => console.warn('Service worker unavailable', error));
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register(`./service-worker.js?v=${APP_VERSION}`)
+    .then(registration => registration.update())
+    .catch(error => console.warn('Service worker unavailable', error));
 }
 
 function selectedMealFromCurrentModal() {
@@ -1901,7 +1985,7 @@ $('#resetButton').addEventListener('click', () => {
 $('#modalContent').addEventListener('click', event => {
   if (event.target.id === 'createFoodButton') showCustomFoodForm('', selectedMealFromCurrentModal());
   if (event.target.id === 'lookupBarcode') lookupBarcode($('#barcodeInput').value);
-  if (event.target.id === 'cameraBarcode') void startBarcodeCamera();
+  if (event.target.id === 'cameraBarcode' || event.target.id === 'retryBarcodeCamera') void startBarcodeCamera();
   if (event.target.id === 'barcodeTorch') void toggleBarcodeTorch();
   if (event.target.id === 'barcodeSwitchCamera') void switchBarcodeCamera();
   if (event.target.id === 'resumeBarcodePreview') void resumeBarcodePreview();

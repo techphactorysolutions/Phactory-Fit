@@ -1,26 +1,31 @@
-const CACHE = 'phactoryfit-v1.6.0';
+const CACHE = 'phactoryfit-v1.6.1';
 const OFFLINE_PAGE = './index.html';
-const APP_SHELL = [
+const CORE_SHELL = [
   './',
   OFFLINE_PAGE,
-  './styles.css?v=1.6.0',
-  './app.js?v=1.6.0',
-  './config.js?v=1.6.0',
-  './vendor/zxing-browser.min.js?v=1.6.0',
-  './manifest.webmanifest',
+  './styles.css?v=1.6.1',
+  './app.js?v=1.6.1',
+  './config.js?v=1.6.1',
+  './manifest.webmanifest'
+];
+const OPTIONAL_SHELL = [
+  './zxing-browser.min.js?v=1.6.1',
   './apple-touch-icon.png',
-  './assets/favicon-32.png',
-  './assets/apple-touch-icon-180.png',
-  './assets/icon-192.png',
-  './assets/icon-512.png',
-  './assets/icon-maskable-192.png',
-  './assets/icon-maskable-512.png'
+  './favicon-32.png',
+  './apple-touch-icon-180.png',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-192.png',
+  './icon-maskable-512.png'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE)
-      .then(cache => cache.addAll(APP_SHELL))
+      .then(async cache => {
+        await cache.addAll(CORE_SHELL);
+        await Promise.allSettled(OPTIONAL_SHELL.map(asset => cache.add(asset)));
+      })
       .then(() => self.skipWaiting())
   );
 });
@@ -35,7 +40,6 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
 
@@ -54,9 +58,10 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      const network = fetch(event.request)
+  const isCode = /\.(?:js|css)$/.test(requestUrl.pathname);
+  if (isCode) {
+    event.respondWith(
+      fetch(event.request)
         .then(response => {
           if (response.ok && response.type === 'basic') {
             const copy = response.clone();
@@ -64,8 +69,18 @@ self.addEventListener('fetch', event => {
           }
           return response;
         })
-        .catch(() => cached || new Response('Offline', {status:503,statusText:'Offline'}));
-      return cached || network;
-    })
+        .catch(async () => (await caches.match(event.request)) || new Response('Offline', {status:503,statusText:'Offline'}))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+      if (response.ok && response.type === 'basic') {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(event.request, copy));
+      }
+      return response;
+    }).catch(() => new Response('Offline', {status:503,statusText:'Offline'})))
   );
 });

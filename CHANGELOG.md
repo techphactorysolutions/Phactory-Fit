@@ -1,6 +1,17 @@
 # Changelog
+## 1.6.1 — iPhone Scanner Engine Hotfix
 
-## v1.6.0 — July 12, 2026
+- Moved all required runtime assets to the repository root for reliable GitHub mobile uploads.
+- Embedded the ZXing scanner engine directly in `index.html`, so the camera decoder is available whenever the page loads.
+- Added a root `zxing-browser.min.js` recovery copy and dynamic retry loader.
+- Loads the scanner engine before requesting camera permission, preventing the iPhone preview from opening and immediately closing.
+- Added an in-app scanner retry action with a precise deployment error.
+- Made service-worker installation resilient and changed JavaScript/CSS to network-first updates.
+- Automatically reloads once when the updated service worker takes control.
+- Flattened manifest icons to avoid missing nested folders during iPhone GitHub uploads.
+
+
+## v1.6.1 — July 12, 2026
 
 ### Corrected nutrition calculations
 - Reject packaged-food records that omit any core macro instead of silently treating missing values as zero
