@@ -1,4 +1,4 @@
-# PhactoryFit 1.7.0 Threat Model
+# PhactoryFit 1.8.0 Threat Model
 
 ## System summary
 
@@ -47,7 +47,7 @@ PhactoryFit is a static PWA deployed from GitHub Pages. First-party HTML, CSS, J
 - unauthorized GitHub collaborator or compromised maintainer account;
 - person with local access to the unlocked device/browser profile.
 
-## Out of scope for 1.7.0
+## Out of scope for 1.8.0
 
 There is no backend, account, password, session, SQL database, file-upload server, payment system, multi-tenant authorization layer, or cloud health-data store. Server-side authorization, CSRF, SQL injection, SSRF, password reset, OAuth, rate limiting, and tenant isolation must be added to the threat model if those components are introduced.
 
@@ -62,3 +62,7 @@ A public release should not ship unless:
 - a dedicated origin is selected for real users;
 - camera close behavior is verified on a physical iPhone;
 - backup export/import is verified with non-production test data.
+
+## 1.8.0 restaurant-data extension
+
+The restaurant catalog adds integrity and staleness risk, not a new privileged backend. Mitigations include a frozen same-origin data file, field-length normalization, escaped rendering, explicit nutrient-availability metadata, verification dates, location/customization caveats, and automated regression tests. Incorrect or stale restaurant nutrition remains a residual data-quality risk and must be reviewed periodically against official U.S. sources.

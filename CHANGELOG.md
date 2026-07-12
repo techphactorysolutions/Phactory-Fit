@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.8.0 — July 12, 2026
+
+### Restaurant search
+- Added a same-origin, offline U.S. restaurant catalog with 43 records across McDonald's, Chick-fil-A, Starbucks, and Taco Bell.
+- Added McDonald's breakfast search for Hash Browns, McMuffins, McGriddles, biscuits, burrito, oatmeal, hotcakes, bagel, and breakfast platters.
+- Added restaurant/meal intent matching and alias normalization for punctuation and common shorthand.
+- Added one-tap restaurant search chips.
+- Added state-code labeling without GPS access.
+
+### Smarter eating-out guidance
+- Added an explainable plan-fit score using remaining calories, remaining protein, and protein density.
+- Chain/category searches such as `McDonald's breakfast` now rank plan-fit recommendations before high-calorie platters.
+- Added same-restaurant alternatives ranked for the current day.
+- Added visible limitations so recommendations are not presented as medical or allergy guidance.
+
+### Nutrition integrity
+- Added per-field nutrient availability metadata.
+- Partial records no longer display missing macros as verified zeroes.
+- Diary previews use an em dash for unavailable nutrients and warn which totals will be incomplete.
+- Added verification dates and location/customization caveats to restaurant records.
+
+### PWA and testing
+- Added `restaurant-foods.js` to the required offline shell and cache allowlist.
+- Added four restaurant browser regression tests.
+- Expanded static security checks to cover the catalog.
+
 ## v1.7.0 — July 12, 2026
 
 ### Public security hardening

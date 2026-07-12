@@ -1,14 +1,7 @@
-PhactoryFit 1.7.0 dependency and supply-chain audit
-
-Locked runtime scanner: @zxing/browser 0.2.1
-Vendored SHA-256: 066bc34edfcdd4a33f0964aeec967752a0dea1ccaf36e58e319ac9fcb5070f6a
-Vendored file comparison: PASS — byte-for-byte match with node_modules/@zxing/browser/umd/zxing-browser.min.js
-npm audit --omit=dev --audit-level=high: PASS
-Known vulnerabilities reported by npm audit at audit time:
-- critical: 0
-- high: 0
-- moderate: 0
-- low: 0
-- info: 0
-
-Audit environment used Node.js 22.16.0 and npm 10.9.2. @zxing/library 0.23.0 declares Node.js 24+ for package tooling, so the included GitHub Actions workflow uses Node.js 24. This engine warning does not affect the already-built browser bundle executed by the static PWA.
+npm audit --omit=dev
+Critical: 0
+High: 0
+Moderate: 0
+Low: 0
+Info: 0
+Total: 0

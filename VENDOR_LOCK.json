@@ -1,5 +1,5 @@
 {
-  "generated_for": "PhactoryFit 1.7.0",
+  "generated_for": "PhactoryFit 1.8.0",
   "runtime_vendor": {
     "file": "zxing-browser.min.js",
     "package": "@zxing/browser",

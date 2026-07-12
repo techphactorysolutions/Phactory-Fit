@@ -1,0 +1,5 @@
+PASS test_mcdonalds_breakfast_search_and_log
+PASS test_restaurant_shortcuts_and_chain_coverage
+PASS test_partial_nutrition_never_looks_like_verified_zero
+PASS test_location_label_and_normalized_alias_search
+PASSED 4/4 restaurant search tests
