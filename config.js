@@ -1,7 +1,8 @@
-// Optional production override for barcode product lookup.
-// Leave blank to use PhactoryFit's direct, read-only public Open Food Facts lookup.
-// When set, this proxy is attempted first and should accept ?barcode=UPC_OR_EAN,
-// returning either an Open Food Facts response or a normalized product object.
+// Optional production overrides for Open Food Facts lookups.
+// Leave blank to use PhactoryFit's direct, read-only public endpoints.
+// offProxyUrl should accept ?barcode=UPC_OR_EAN.
+// offSearchProxyUrl should accept ?q=SEARCH_TEXT and return { products: [...] }.
 window.PHACTORYFIT_CONFIG = {
-  offProxyUrl: ''
+  offProxyUrl: '',
+  offSearchProxyUrl: ''
 };

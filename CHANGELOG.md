@@ -1,5 +1,68 @@
 # Changelog
 
+## v1.6.0 — July 12, 2026
+
+### Corrected nutrition calculations
+- Reject packaged-food records that omit any core macro instead of silently treating missing values as zero
+- Added serving conversion for g, kg, mg, ml, l, oz, lb, and fl oz
+- Prefer explicit metric quantities in mixed labels such as `1 oz (28 g)`
+- Added kilojoule-to-kilocalorie fallback conversion
+- Made sodium and cholesterol milligram conversion source-unit aware
+- Routed voice food searches through online packaged-food search
+
+### Protected data integrity
+- Filter future weigh-ins during backup import and local-state normalization
+- Remove duplicate saved foods by normalized ID and barcode
+- Clamp cumulative workout minutes, exercise calories, water, custom foods, and daily food-entry counts
+- Reject non-HTTPS external product images
+
+### Improved progress accuracy
+- Space weight-chart points by actual calendar dates
+- Add an accessible chart summary for screen readers
+- Calculate adherence from completed days rather than an unfinished current day
+
+### Hardened iPhone Safari behavior
+- Keep the camera stream alive during transient visibility changes
+- Pause barcode decoding while hidden and resume when visible
+- Retain authoritative cleanup on explicit close and `pagehide`
+- Prevent Safari input auto-zoom with 16 px modal controls
+- Added stronger focus-visible, reduced-motion, touch-action, and safe-area behavior
+
+### Added production test assets
+- Added a reproducible 17-test Playwright browser/calculation suite
+- Added an 83-check static, PWA, asset, security, and accessibility audit
+- Added a generated EAN-13 test fixture, test requirements, test plan, and captured result logs
+
+### Validation
+- 17/17 browser and calculation tests passed
+- 83/83 static, PWA, asset, security, and accessibility checks passed
+- A physical iPhone camera and deployed HTTPS offline reload remain required release checks
+
+## v1.5.0 — July 11, 2026
+
+### Added
+- Online food and brand search from the Food logger
+- Packaged-food results for searches such as Doritos, Pepsi, and Coke
+- Complete Nutrition Facts detail before logging
+- Serving quick picks for 0.5, 1, 1.5, and 2 servings
+- Live calorie and macro totals for the selected serving quantity
+- Search-result caching and local product memory after logging
+- Optional `offSearchProxyUrl` configuration
+- Full-screen iPhone barcode-camera mode
+- Safari **Start preview** recovery control
+- Dedicated **Close camera** control
+
+### Fixed
+- Brief Safari visibility changes no longer immediately stop the camera
+- Camera video playback now explicitly applies inline and muted playback properties
+- A rejected or stalled Safari preview no longer destroys the active stream
+- Online search requests are debounced, cached, and cancelled when the logger closes
+- Search results preserve meal selection and serving calculations
+
+### Validation
+- 11/11 browser and barcode integration tests passed
+- 70/70 static, PWA, asset, scanner, search, and security checks passed
+
 ## v1.4.0 — July 11, 2026
 
 - Added automatic Nutrition Facts generation after a successful barcode scan or manual barcode lookup
