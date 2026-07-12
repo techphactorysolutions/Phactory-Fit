@@ -1,4 +1,4 @@
-# PhactoryFit 1.9.0 Release Validation Plan
+# PhactoryFit 1.10.0 Release Validation Plan
 
 ## Automated
 
@@ -7,6 +7,8 @@ npm run test:static
 npm run test:service-worker
 npm run test:browser-security
 npm run test:restaurant
+npm run test:ui
+npm run test:camera
 npm audit --omit=dev --audit-level=high
 node --check app.js
 node --check restaurant-foods.js
@@ -19,6 +21,8 @@ Expected results:
 - 6/6 service-worker checks
 - 5/5 browser security checks
 - 4/4 restaurant workflow checks
+- 5/5 UI and diary-editing checks
+- 3/3 iPhone camera lifecycle checks
 - zero npm audit vulnerabilities
 
 ## Manual restaurant validation
@@ -38,13 +42,13 @@ Expected results:
 
 1. Deploy all package files to GitHub Pages.
 2. Open the site in Safari and refresh twice.
-3. Confirm Settings displays Version 1.9.0.
+3. Confirm Settings displays Version 1.10.0.
 4. Test restaurant search online and offline.
 5. Test rear-camera barcode scanning after allowing permission.
 6. Close and reopen the Home Screen app and verify the restaurant catalog still works offline.
 7. Export a backup, add a restaurant item, import the backup, and confirm previous data is restored.
 
-## v1.9 UI validation additions
+## v1.10 UI validation additions
 
 1. Confirm the header reads “Designed by Tech Phactory Solutions” and displays the slogan “Build better. Fuel smarter. Live stronger.”
 2. Confirm calories, protein, carbohydrates, and fat each display a circular gauge with correct percentage, consumed amount, goal, and remaining/over amount.
@@ -53,3 +57,14 @@ Expected results:
 5. Test Today, Diary, Log, Progress, Coach, and Settings at iPhone and iPad widths.
 6. Confirm the hero “Log your first meal” button opens Add food.
 7. Confirm the rear-camera scanner remains open after permission and still closes its tracks when the scanner is explicitly dismissed.
+
+## v1.10 diary editing validation
+
+1. Log or scan a food and open **Diary**.
+2. Confirm the entry displays its local logging time and an **Edit** action.
+3. Open the editor and change the meal period from Morning / Breakfast to Evening / Dinner.
+4. Change the exact time and confirm the entry is sorted chronologically in the destination section.
+5. Change servings to 1.5 and confirm calories, protein, carbohydrates, and fat update before saving.
+6. Save, close, and reopen the app; confirm the meal period, time, and portion persist.
+7. Open the editor again, delete the entry, and confirm daily totals update immediately.
+8. Import a v1.9 backup containing entries without time and confirm they display **Time not set** rather than failing.

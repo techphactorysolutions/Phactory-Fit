@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Visual-system and mobile interaction regression checks for PhactoryFit v1.9."""
+"""Visual-system and mobile interaction regression checks for PhactoryFit v1.10."""
 from __future__ import annotations
 
 import asyncio
@@ -76,7 +76,7 @@ async def test_cosmic_dashboard_and_all_four_gauges(browser):
       theme:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
       motion:document.documentElement.classList.contains('motion-ready')
     })""")
-    assert result["version"] == "1.9.0", result
+    assert result["version"] == "1.10.0", result
     assert result["slogan"] == "Build better. Fuel smarter. Live stronger.", result
     assert result["studio"] == "Tech Phactory Solutions", result
     assert result["width"][0] == result["width"][1], result
@@ -137,12 +137,78 @@ async def test_tablet_layout(browser):
     await context.close()
 
 
+async def test_diary_entry_edit_move_time_portion_and_delete(browser):
+    context, page, errors = await new_page(browser)
+    await page.evaluate("""() => {
+      const today = localDateKey();
+      state.days[today] = {
+        ...emptyDay(),
+        foods:[{
+          id:'editable-food', logId:'editable-log', name:'Editable meal', brand:'Test Kitchen',
+          serving:'1 sandwich', meal:'Breakfast', quantity:1, loggedTime:'08:15',
+          calories:320, protein:24, carbs:30, fat:12, fiber:2, sugar:4, sodium:500
+        }]
+      };
+      state.selectedDate = today;
+      render();
+      navigate('diary');
+    }""")
+    await page.click('[data-edit-food="editable-log"]')
+    assert await page.locator('#modalTitle').inner_text() == 'Edit entry'
+    assert await page.locator('select[name="meal"]').input_value() == 'Breakfast'
+    assert await page.locator('input[name="loggedTime"]').input_value() == '08:15'
+    assert await page.locator('#editFoodQuantityInput').input_value() == '1'
+
+    await page.select_option('select[name="meal"]', 'Dinner')
+    await page.fill('input[name="loggedTime"]', '19:45')
+    await page.fill('#editFoodQuantityInput', '1.5')
+    await page.locator('#editFoodQuantityInput').dispatch_event('input')
+    preview = await page.locator('#servingTotalPreview').inner_text()
+    assert '480' in preview and '36' in preview, preview
+    await page.click('#editDiaryFoodForm button[type="submit"]')
+
+    result = await page.evaluate("""() => {
+      const entry = getDay().foods.find(food => food.logId === 'editable-log');
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      const savedEntry = saved.days[state.selectedDate].foods.find(food => food.logId === 'editable-log');
+      return {
+        entry:{meal:entry.meal,quantity:entry.quantity,loggedTime:entry.loggedTime},
+        saved:{meal:savedEntry.meal,quantity:savedEntry.quantity,loggedTime:savedEntry.loggedTime},
+        breakfast:document.querySelectorAll('.meal-section')[0].textContent,
+        dinner:document.querySelectorAll('.meal-section')[2].textContent,
+      };
+    }""")
+    expected = {'meal':'Dinner','quantity':1.5,'loggedTime':'19:45'}
+    assert result['entry'] == expected, result
+    assert result['saved'] == expected, result
+    assert 'Editable meal' not in result['breakfast'], result
+    assert 'Editable meal' in result['dinner'] and '7:45 PM' in result['dinner'] and '480 kcal' in result['dinner'], result
+    overflow = await page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+    assert overflow == 0, overflow
+
+    await page.click('[data-edit-food="editable-log"]')
+    await page.click('[data-delete-diary-food="editable-log"]')
+    deleted = await page.evaluate("() => !getDay().foods.some(food => food.logId === 'editable-log')")
+    assert deleted is True
+    assert await page.locator('[data-edit-food="editable-log"]').count() == 0
+
+    await page.evaluate("() => { openModal('food', {meal:'Lunch'}); showFoodQuantity(findFoodById('egg'), 'Lunch'); }")
+    await page.fill('#foodQuantityInput', '2')
+    await page.click('#addFoodForm button[type="submit"]')
+    new_entry = await page.evaluate("() => getDay().foods.at(-1)")
+    assert new_entry['meal'] == 'Lunch' and new_entry['quantity'] == 2, new_entry
+    assert len(new_entry.get('loggedTime', '')) == 5 and new_entry['loggedTime'][2] == ':', new_entry
+    assert not errors, errors
+    await context.close()
+
+
 async def main():
     tests = [
         test_cosmic_dashboard_and_all_four_gauges,
         test_navigation_and_hero_action,
         test_scroll_reveal_and_reduced_motion,
         test_tablet_layout,
+        test_diary_entry_edit_move_time_portion_and_delete,
     ]
     async with async_playwright() as playwright:
         launch_options = {

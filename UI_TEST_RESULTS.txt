@@ -2,4 +2,5 @@ PASS test_cosmic_dashboard_and_all_four_gauges
 PASS test_navigation_and_hero_action
 PASS test_scroll_reveal_and_reduced_motion
 PASS test_tablet_layout
-PASSED 4/4 UI regression tests
+PASS test_diary_entry_edit_move_time_portion_and_delete
+PASSED 5/5 UI regression tests

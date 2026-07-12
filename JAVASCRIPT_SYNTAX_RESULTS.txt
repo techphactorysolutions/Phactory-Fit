@@ -1,1 +1,1 @@
-PASSED JavaScript syntax checks: app.js, restaurant-foods.js, service-worker.js
+PASS: app.js, restaurant-foods.js, and service-worker.js syntax valid

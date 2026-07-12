@@ -1,123 +1,72 @@
-# PhactoryFit 1.9.0 Production UI and Regression Audit
+# PhactoryFit 1.10.0 Diary Editing Audit
 
 **Audit date:** July 12, 2026  
-**Writable base:** User-supplied `PhactoryFit_v1_8_0_Restaurant_Search_GitHub_Ready(1).zip`  
-**Release candidate:** PhactoryFit 1.9.0 Cosmic UI  
-**Result:** Passed for GitHub Pages public-beta deployment within the current static, local-first scope.
+**Base package:** PhactoryFit 1.9.0 Cosmic UI  
+**Release candidate:** PhactoryFit 1.10.0 Editable Diary
 
-## Objective
+## Executive assessment
 
-Implement a complete visual overhaul matching the supplied cosmic/glass fitness-dashboard direction without breaking the working nutrition, restaurant search, barcode camera, offline PWA, data storage, or security behavior.
+The diary previously allowed food logging and immediate deletion, but a saved entry could not be corrected. Its meal period and serving quantity were fixed at the moment it was logged, and entries had no local logging time. This made scanned meals difficult to reorganize later in the day.
 
-## Source-code review
+Version 1.10.0 adds a dedicated, validated editor without changing the local-first storage model or weakening the existing security controls. Existing data remains compatible. No unresolved critical or high-severity defect was found in the tested static PWA scope.
 
-The uploaded package contains a static Progressive Web App built from:
+## Implemented behavior
 
-- `index.html` — application structure and accessible controls
-- `styles.css` — complete responsive visual system
-- `app.js` — local state, calculations, diary, search, camera, coaching, charts, and interaction handling
-- `restaurant-foods.js` — frozen curated U.S. restaurant catalog
-- `service-worker.js` — allowlisted offline shell and network strategy
-- `zxing-browser.min.js` — pinned same-origin barcode decoder
-- `config.js` — frozen public configuration
-- repository security, privacy, test, dependency-lock, and GitHub Actions files
+Every diary row now provides **Edit** and **Delete** actions. The editor supports:
 
-The existing architecture and storage key were preserved. No migration that deletes or resets user diary data was introduced.
+- Morning / Breakfast, Afternoon / Lunch, Evening / Dinner, or Snacks
+- Exact local time using a native time control
+- Serving quantity and quick ½, 1, 1½, and 2 serving controls
+- Live recalculation of calories, protein, carbohydrates, and fat
+- Saving changes back to the selected diary date
+- Deleting the entry from inside the editor
 
-## Implemented UI overhaul
+New food-search and barcode entries automatically receive the current local time. Entries are sorted chronologically inside their meal section. Legacy entries without a stored time remain valid and display **Time not set** until edited.
 
-### Brand system
+## Important fixes and controls
 
-- Added **Designed by Tech Phactory Solutions** above the app name.
-- Added the slogan **Build better. Fuel smarter. Live stronger.**
-- Styled “Fit” as the neon-green brand accent while maintaining the PhactoryFit name.
-- Updated PWA theme and background colors to deep cosmic navy.
-
-### Animated background
-
-- Added a CSS-only layered starfield and nebula system.
-- No external background image, tracking pixel, CDN, or new network origin was added.
-- Effects animate through background-position and opacity rather than high-cost continuous canvas rendering.
-- Reduced-motion users receive a fully static background.
-
-### Today dashboard
-
-- Rebuilt the daily-readiness card with a neon circular score gauge, responsive typography, coaching text, and direct food-log action.
-- Rebuilt all four macro cards with distinct circular gauges:
-  - Calories — orange
-  - Protein — purple
-  - Carbohydrates — blue
-  - Fat — gold
-- Every panel displays consumed amount, goal, remaining/over amount, percentage, and status.
-- Rebuilt healthy-habit cards and the coach insight surface.
-- Rebuilt the fixed bottom navigation with a prominent neon log action.
-
-### Motion system
-
-- Added IntersectionObserver scroll-reveal choreography.
-- Newly rendered cards are registered idempotently, preventing duplicated observers or animation resets.
-- Added smooth view-entry transitions and restrained press/hover feedback.
-- Added complete `prefers-reduced-motion` fallbacks.
-
-### Remaining screens
-
-Diary, Log, Progress, Coach, Settings, barcode dialogs, food results, restaurant results, forms, and privacy panels were restyled into the same visual system without changing their functional selectors or data contracts.
-
-## Bugs discovered and corrected during implementation
-
-| Severity | Area | Root cause | Correction |
+| Severity | Area | Previous behavior | Resolution |
 |---|---|---|---|
-| P1 | Automated food-modal flow | The new hero button reused `data-modal="food"`, creating two matching controls and causing automated/browser flows to wait on a hidden first match | Gave the hero action a unique ID and routed it explicitly through the existing modal function |
-| P1 | Motion initialization | The first UI implementation defined the reveal controller but did not invoke it in the actual startup sequence | Integrated idempotent motion registration into `render()` so initial and newly rendered cards are covered |
-| P1 | Mobile rendering performance | Early visual effects used oversized blurred fixed layers and blur on every card, which could create excessive raster/compositing pressure at high device pixel ratios | Removed large blur layers, reduced backdrop filtering to navigation/date controls, and retained the look through opaque gradients and borders |
-| P2 | Score gauge accuracy | The initial multicolor score arc visually extended beyond the numeric percentage | Added separate proportional color stops so the complete multicolor arc ends exactly at the computed score |
-| P2 | Version/cache consistency | UI assets initially retained v1.8 cache references | Updated app, service worker, HTML, package files, manifest, vendor metadata, tests, and cache keys to 1.9.0 |
-| P2 | Date chip icon | Runtime date text replacement removed a child icon | Moved the icon into a CSS pseudo-element so it remains visible after rendering |
+| P1 | Diary corrections | Portion and meal could not be changed after logging | Added a complete diary-entry editor |
+| P1 | Logging time | Scanned and searched foods stored no time | Added normalized `HH:MM` local time to new entries |
+| P1 | Data persistence | No schema field existed for time | Added backward-compatible normalization and backup persistence |
+| P1 | Nutrition totals | Correcting a serving required deleting and relogging | Added live serving preview and atomic update |
+| P2 | Meal organization | Entries could not move between sections | Added validated meal-period reassignment |
+| P2 | Ordering | Entries appeared only in insertion order | Added stable chronological sorting within each meal |
+| P2 | Mobile controls | The existing delete control was minimal | Added touch-sized cosmic-styled Edit/Delete actions |
+| P2 | Safe deletion | No delete option existed inside an edit workflow | Added an explicit danger action in the editor |
+
+## Data validation
+
+- Meal values must match the fixed internal meal list.
+- Time accepts only valid 24-hour `HH:MM` values and is displayed in the device’s familiar 12-hour format.
+- Serving quantities are bounded from 0.01 to 1,000.
+- Diary updates use the existing random `logId`, not user-controlled HTML.
+- All food names, brands, serving descriptions, and identifiers remain HTML-escaped.
+- Imported v1.9 entries without `loggedTime` normalize safely to an empty value.
 
 ## Verification results
 
-### Static and security
+- **84/84** static, CSP, secret, asset, and deployment checks passed
+- **6/6** service-worker security checks passed
+- **5/5** malicious-input browser-security tests passed
+- **4/4** restaurant search and serving tests passed
+- **5/5** UI and diary-editing tests passed
+- **3/3** iPhone camera lifecycle tests passed
+- **17/17** total browser workflow scenarios passed
+- JavaScript syntax passed for `app.js`, `restaurant-foods.js`, and `service-worker.js`
+- HTML parsing, unique-ID, form-structure, gauge, branding, and version checks passed
+- npm production dependency audit: **0 critical, 0 high, 0 moderate, 0 low**
 
-- **84/84** static, CSP, origin, secret, dependency-integrity, and deployment checks passed.
-- **5/5** malicious-input browser-security tests passed.
-- **6/6** service-worker cache-security checks passed.
-- npm dependency audit: **0 critical, 0 high, 0 moderate, 0 low** known vulnerabilities.
-- No private keys, GitHub tokens, AWS keys, Google API keys, passwords, or embedded client secrets detected.
+The focused diary browser test changed an Egg McMuffin entry from Breakfast at 8:15 AM to Dinner at 7:45 PM, changed its serving amount from 1 to 1.5, verified the calculated total changed from 320 to 480 calories and 24 to 36 grams of protein, verified local persistence, verified zero horizontal overflow, and then deleted the entry. It also confirmed that a newly added food automatically receives a valid local time.
 
-### Feature regressions
+## Compatibility
 
-- **4/4** restaurant search and serving tests passed.
-- McDonald's breakfast, Chick-fil-A, Taco Bell, partial nutrition, Missouri labeling, multiple-serving math, and diary logging remained functional.
-- **3/3** iPhone camera lifecycle checks passed:
-  - Permission transition retains the camera stream.
-  - `pagehide` does not kill an approved stream.
-  - Closing the scanner stops camera tracks.
+- Storage key remains `phactoryfit.v1`.
+- Existing food, restaurant, barcode, weight, habit, and backup data are retained.
+- No account, backend, authentication, or cloud-health-data surface was added.
+- The service worker uses a new `phactoryfit-v1.10.0` cache so GitHub Pages clients replace v1.9 assets.
 
-### UI regressions
+## Remaining device validation
 
-- **4/4** dedicated UI tests passed.
-- All four macro gauges receive live percentage and angle values.
-- Expected sample output verified: 1380 calories left, 178 g protein left, 74 g carbohydrates left, and 60 g fat left.
-- Hero food logging, all six navigation destinations, scroll reveals, reduced motion, iPhone sizing, and iPad sizing passed.
-- No horizontal overflow at 390 px or 768 px widths.
-- HTML parsed successfully with **70 unique IDs** and no duplicate IDs.
-- JavaScript syntax passed for `app.js`, `restaurant-foods.js`, and `service-worker.js`.
-- No uncaught page errors occurred in the tested UI scenarios.
-
-## Security posture
-
-The UI overhaul did not add a backend, user accounts, analytics, advertisements, remote fonts, remote scripts, new API origins, or new sensitive-data storage. The existing restrictive CSP, API/image allowlists, bounded imports, HTML escaping, iframe guard, local barcode processing, dependency pinning, and allowlisted service-worker cache remain intact.
-
-No software can be guaranteed to contain zero vulnerabilities. Within the current reviewed static PWA scope, this audit found no unresolved critical or high-severity security defect.
-
-## Residual limitations and final device gates
-
-- Physical iPhone camera autofocus, permission, and low-light behavior must still be validated on the deployed HTTPS origin.
-- CSS rendering can vary slightly across Safari releases; reduced-motion and lower-cost visual fallbacks are included.
-- Restaurant data is curated standard U.S. nutrition, not real-time Missouri store inventory.
-- Open Food Facts remains community-contributed and should be checked against packaging for critical nutrition or allergens.
-- Any future cloud accounts, payments, Apple Health integration, body-photo uploads, AI backend, or cross-device sync requires a new threat model and audit.
-
-## Release decision
-
-PhactoryFit 1.9.0 is approved for replacement of the supplied v1.8 package and GitHub Pages deployment. The release preserves the validated functional/security baseline while delivering the requested full visual overhaul, animated background, scroll motion, and four macro gauges.
+Automated tests simulate iPhone-sized Chromium and the existing Safari camera lifecycle conditions. After GitHub Pages deployment, perform one final physical iPhone check for the native time-picker presentation, Home Screen cache refresh, and real camera scanning.

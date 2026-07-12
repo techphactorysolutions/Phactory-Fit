@@ -1,12 +1,13 @@
 'use strict';
 
 const STORAGE_KEY = 'phactoryfit.v1';
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 const MAX_LOG_ENTRIES_PER_DAY = 5000;
 const MAX_CUSTOM_FOODS = 10000;
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 const VALID_VIEWS = new Set(['today', 'diary', 'log', 'progress', 'coach', 'settings']);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const MAX_FOOD_SEARCH_LENGTH = 120;
 const MAX_API_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
@@ -97,6 +98,34 @@ function uid(prefix = 'id') {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function currentLocalTime(date = new Date()) {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function normalizeLoggedTime(value) {
+  const time = String(value || '').trim();
+  return TIME_PATTERN.test(time) ? time : '';
+}
+
+function formatLoggedTime(value) {
+  const time = normalizeLoggedTime(value);
+  if (!time) return 'Time not set';
+  const [hours, minutes] = time.split(':').map(Number);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = hours % 12 || 12;
+  return `${displayHour}:${String(minutes).padStart(2, '0')} ${suffix}`;
+}
+
+function mealPeriodLabel(meal) {
+  return ({Breakfast:'Morning', Lunch:'Afternoon', Dinner:'Evening', Snacks:'Any time'})[meal] || meal;
+}
+
+function loggedFoodById(logId) {
+  return getDay().foods.find(food => food.logId === String(logId || '')) || null;
+}
+
 function normalizeFood(raw, fallbackId = uid('food')) {
   if (!raw || typeof raw !== 'object') return null;
   const name = String(raw.name || raw.product_name || '').trim().slice(0, 200);
@@ -139,6 +168,7 @@ function normalizeLogEntry(raw) {
     ...food,
     meal: MEALS.includes(raw.meal) ? raw.meal : 'Breakfast',
     quantity: toNumber(raw.quantity, 1, 0.01, 1000),
+    loggedTime: normalizeLoggedTime(raw.loggedTime || raw.time),
     logId: String(raw.logId || uid('log')).slice(0, 200)
   };
 }
@@ -673,12 +703,20 @@ function initializeMotionEffects() {
 function renderDiary() {
   const day = getDay();
   $('#mealSections').innerHTML = MEALS.map(meal => {
-    const entries = day.foods.filter(food => food.meal === meal);
+    const entries = day.foods
+      .filter(food => food.meal === meal)
+      .map((entry, index) => ({entry,index}))
+      .sort((a, b) => {
+        const aTime = normalizeLoggedTime(a.entry.loggedTime) || '99:99';
+        const bTime = normalizeLoggedTime(b.entry.loggedTime) || '99:99';
+        return aTime.localeCompare(bTime) || a.index - b.index;
+      })
+      .map(item => item.entry);
     const calories = round(entries.reduce((sum, entry) => sum + entry.calories * entry.quantity, 0));
     const body = entries.length
-      ? entries.map(entry => `<div class="food-row"><div><h4>${escapeHtml(entry.name)}</h4><p>${escapeHtml(entry.serving)} × ${round(entry.quantity, 2)} · ${round(entry.protein * entry.quantity)}g protein</p></div><div><strong>${round(entry.calories * entry.quantity)} kcal</strong><button type="button" class="remove-food" data-remove-food="${escapeHtml(entry.logId)}" aria-label="Remove ${escapeHtml(entry.name)}">×</button></div></div>`).join('')
+      ? entries.map(entry => `<div class="food-row"><div class="food-row-copy"><h4>${escapeHtml(entry.name)}</h4><p><span class="food-time">${escapeHtml(formatLoggedTime(entry.loggedTime))}</span> · ${escapeHtml(entry.serving)} × ${round(entry.quantity, 2)} · ${round(entry.protein * entry.quantity)}g protein</p></div><div class="food-row-summary"><strong>${round(entry.calories * entry.quantity)} kcal</strong><div class="food-row-actions"><button type="button" class="edit-food" data-edit-food="${escapeHtml(entry.logId)}" aria-label="Edit ${escapeHtml(entry.name)}">Edit</button><button type="button" class="remove-food" data-remove-food="${escapeHtml(entry.logId)}" aria-label="Delete ${escapeHtml(entry.name)}">Delete</button></div></div></div>`).join('')
       : `<button type="button" class="empty-meal" data-add-meal="${meal}">+ Add ${meal.toLowerCase()}</button>`;
-    return `<section class="meal-section"><div class="meal-header"><span>${meal}</span><small>${calories} kcal</small></div>${body}</section>`;
+    return `<section class="meal-section"><div class="meal-header"><div><span>${meal}</span><small>${mealPeriodLabel(meal)}</small></div><small>${calories} kcal</small></div>${body}</section>`;
   }).join('');
 }
 
@@ -909,11 +947,11 @@ function openModal(type, options = {}) {
   foodSearchTimer = null;
   foodSearchRequest += 1;
   const configurations = {
-    food:['Nutrition','Add food'],barcode:['Fast logging','Barcode lookup'],workout:['Training','Log workout'],weight:['Progress','Log weight'],water:['Hydration','Add water'],habits:['Daily inputs','Steps and sleep'],date:['Diary date','Choose a day']
+    food:['Nutrition','Add food'],barcode:['Fast logging','Barcode lookup'],workout:['Training','Log workout'],weight:['Progress','Log weight'],water:['Hydration','Add water'],habits:['Daily inputs','Steps and sleep'],date:['Diary date','Choose a day'],editFood:['Food diary','Edit entry']
   };
   if (!configurations[type]) return;
   stopBarcodeCamera();
-  modalContext = {meal:MEALS.includes(options.meal) ? options.meal : 'Breakfast'};
+  modalContext = {meal:MEALS.includes(options.meal) ? options.meal : 'Breakfast',logId:String(options.logId || '')};
   const [eyebrow, title] = configurations[type];
   setText('modalEyebrow', eyebrow);
   setText('modalTitle', title);
@@ -924,6 +962,11 @@ function openModal(type, options = {}) {
   if (type === 'water') content.innerHTML = waterModal();
   if (type === 'habits') content.innerHTML = habitsModal();
   if (type === 'date') content.innerHTML = dateModal();
+  if (type === 'editFood') {
+    const entry = loggedFoodById(options.logId);
+    if (!entry) { toast('That diary entry could not be found.'); return; }
+    content.innerHTML = editDiaryFoodModal(entry);
+  }
   if (!modal.open) modal.showModal();
   if (type === 'food') {
     onlineFoodResults = [];
@@ -938,6 +981,16 @@ function openModal(type, options = {}) {
 
 function mealOptions(selected) {
   return MEALS.map(meal => `<option ${meal === selected ? 'selected' : ''}>${meal}</option>`).join('');
+}
+
+function mealPeriodOptions(selected) {
+  const labels = {Breakfast:'Morning / Breakfast', Lunch:'Afternoon / Lunch', Dinner:'Evening / Dinner', Snacks:'Snacks'};
+  return MEALS.map(meal => `<option value="${meal}" ${meal === selected ? 'selected' : ''}>${labels[meal]}</option>`).join('');
+}
+
+function editDiaryFoodModal(entry) {
+  const timeValue = normalizeLoggedTime(entry.loggedTime);
+  return `<div class="edit-food-heading"><span class="badge">Diary entry</span><h3>${escapeHtml(entry.name)}</h3><p>${escapeHtml(entry.brand)} · ${escapeHtml(entry.serving)} per serving</p></div><form id="editDiaryFoodForm" class="modal-form edit-diary-food-form"><label>Meal period<select name="meal">${mealPeriodOptions(entry.meal)}</select></label><label>Logged time<input name="loggedTime" type="time" value="${escapeHtml(timeValue)}" step="60"></label><p class="form-note">Use the meal period to move this item between morning, afternoon, evening, or snacks. The exact time controls its order inside that section.</p><label>Servings consumed<input id="editFoodQuantityInput" name="quantity" type="number" inputmode="decimal" step="0.01" min="0.01" max="1000" value="${round(entry.quantity, 2)}" required></label><div class="serving-quick-picks" aria-label="Quick serving amounts"><button type="button" data-serving-value="0.5">½</button><button type="button" data-serving-value="1">1</button><button type="button" data-serving-value="1.5">1½</button><button type="button" data-serving-value="2">2</button></div>${servingTotalsMarkup(entry, entry.quantity)}<input name="logId" type="hidden" value="${escapeHtml(entry.logId)}"><div class="edit-food-actions"><button class="primary-button" type="submit">Save changes</button><button class="danger-button" type="button" data-delete-diary-food="${escapeHtml(entry.logId)}">Delete entry</button></div></form>`;
 }
 
 function foodModal(meal) {
@@ -1421,7 +1474,7 @@ function barcodeCameraErrorMessage(error) {
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'The camera is busy or unavailable. Close other camera apps, return to PhactoryFit, and try again.';
   if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The requested rear-camera mode was unavailable. PhactoryFit will retry with simpler camera settings.';
-  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.9.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
+  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.10.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
   if (name === 'TimeoutError') return 'No barcode was detected. Hold the package 6–10 inches away, avoid glare, and keep the entire barcode inside the frame.';
   return 'The barcode camera could not start. Check camera permission, lighting, and the secure HTTPS address, then try again.';
 }
@@ -2183,6 +2236,18 @@ document.addEventListener('click', event => {
   if (modalButton) { openModal(modalButton.dataset.modal); return; }
   const mealButton = event.target.closest('[data-add-meal]');
   if (mealButton) { openModal('food', {meal:mealButton.dataset.addMeal}); return; }
+  const editFood = event.target.closest('[data-edit-food]');
+  if (editFood) { openModal('editFood', {logId:editFood.dataset.editFood}); return; }
+  const deleteDiaryFood = event.target.closest('[data-delete-diary-food]');
+  if (deleteDiaryFood) {
+    const entry = loggedFoodById(deleteDiaryFood.dataset.deleteDiaryFood);
+    if (!entry) { toast('That diary entry could not be found.'); return; }
+    getDay().foods = getDay().foods.filter(food => food.logId !== entry.logId);
+    modal.close();
+    render();
+    toast(`${entry.name} deleted.`);
+    return;
+  }
   const remove = event.target.closest('[data-remove-food]');
   if (remove) {
     getDay().foods = getDay().foods.filter(food => food.logId !== remove.dataset.removeFood);
@@ -2247,10 +2312,12 @@ document.addEventListener('click', event => {
 
 document.addEventListener('input', event => {
   if (event.target.id === 'foodSearch') scheduleOnlineFoodSearch(event.target.value);
-  if (event.target.id === 'foodQuantityInput' || event.target.id === 'barcodeQuantityInput') {
-    const foodId = event.target.form?.elements?.foodId?.value;
-    const food = findFoodById(foodId);
-    const preview = event.target.form?.querySelector('#servingTotalPreview');
+  if (event.target.id === 'foodQuantityInput' || event.target.id === 'barcodeQuantityInput' || event.target.id === 'editFoodQuantityInput') {
+    const form = event.target.form;
+    const foodId = form?.elements?.foodId?.value;
+    const logId = form?.elements?.logId?.value;
+    const food = logId ? loggedFoodById(logId) : findFoodById(foodId);
+    const preview = form?.querySelector('#servingTotalPreview');
     if (food && preview) preview.outerHTML = servingTotalsMarkup(food, event.target.value);
   }
 });
@@ -2260,6 +2327,22 @@ document.addEventListener('submit', event => {
   const form = event.target;
   const data = Object.fromEntries(new FormData(form));
 
+  if (form.id === 'editDiaryFoodForm') {
+    const logId = String(data.logId || '');
+    const entry = loggedFoodById(logId);
+    const quantity = toNumber(data.quantity, NaN, 0.01, 1000);
+    const loggedTime = normalizeLoggedTime(data.loggedTime);
+    if (!entry || !Number.isFinite(quantity) || !MEALS.includes(data.meal)) { toast('Check the serving amount and meal period.'); return; }
+    if (String(data.loggedTime || '').trim() && !loggedTime) { toast('Enter a valid time.'); return; }
+    entry.meal = data.meal;
+    entry.quantity = quantity;
+    entry.loggedTime = loggedTime;
+    modal.close();
+    render();
+    toast(`${entry.name} updated.`);
+    return;
+  }
+
   if (form.id === 'addFoodForm' || form.id === 'barcodeAddForm') {
     const food = findFoodById(data.foodId);
     const quantity = toNumber(data.quantity, NaN, 0.01, 1000);
@@ -2267,7 +2350,7 @@ document.addEventListener('submit', event => {
     if (food.source === 'Open Food Facts') cacheOnlineFood(food);
     const day = getDay();
     if (day.foods.length >= MAX_LOG_ENTRIES_PER_DAY) { toast('This day has reached the safe food-entry limit.'); return; }
-    day.foods.push({...food,meal:data.meal,quantity,logId:uid('log')});
+    day.foods.push({...food,meal:data.meal,quantity,loggedTime:currentLocalTime(),logId:uid('log')});
     state.recentFoodIds = [food.id, ...state.recentFoodIds.filter(id => id !== food.id)].slice(0, 12);
     modal.close();
     render();

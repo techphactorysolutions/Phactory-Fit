@@ -1,4 +1,8 @@
-# PhactoryFit 1.9.0
+# PhactoryFit 1.10.0
+
+## New in 1.10.0 — Editable diary entries
+
+Open **Diary**, then tap **Edit** beside any food to change its meal period, exact time, or number of servings. Nutrition totals update immediately. Entries can also be deleted from the editor. Newly logged and scanned foods automatically receive the current local time.
 
 **Build better. Fuel smarter. Live stronger.**
 
@@ -43,9 +47,9 @@ All existing restaurant search, barcode scanning, nutrition calculations, securi
 4. Keep **Enforce HTTPS** enabled.
 5. Open the Pages URL directly in Safari and refresh twice.
 6. Fully close and reopen the Home Screen app.
-7. Confirm **Settings → Version 1.9.0**.
+7. Confirm **Settings → Version 1.10.0**.
 
-The service worker uses a new `phactoryfit-v1.9.0` cache, so the older visual bundle is removed during activation.
+The service worker uses a new `phactoryfit-v1.10.0` cache, so the older visual bundle is removed during activation.
 
 ## Repeatable tests
 

@@ -1,9 +1,14 @@
-PhactoryFit 1.9.0 browser regression summary
+PhactoryFit 1.10.0 browser regression summary
 
-PASSED 5/5 browser security tests
-PASSED 4/4 restaurant search and serving tests
-PASSED 4/4 UI, navigation, gauge, responsive-layout, and motion tests
-PASSED 3/3 iPhone camera lifecycle tests
+PASS: 5/5 UI and diary-editing tests
+- Cosmic dashboard and all four macro gauges
+- Navigation and hero logging action
+- Scroll reveal and reduced-motion behavior
+- iPad responsive layout
+- Edit meal period, exact time, serving amount, recalculated totals, persistence, automatic time logging, and deletion
 
-TOTAL: PASSED 16/16 browser regression checks
-No uncaught page errors occurred in the tested scenarios.
+PASS: 5/5 malicious-input browser security tests
+PASS: 4/4 restaurant search and serving tests
+PASS: 3/3 iPhone camera lifecycle tests
+
+TOTAL: 17/17 browser workflow scenarios passed

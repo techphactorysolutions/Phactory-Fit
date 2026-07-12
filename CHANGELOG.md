@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.10.0 — July 12, 2026
+
+### Editable food diary entries
+- Added a dedicated editor for every logged food entry.
+- Added meal-period reassignment between Morning / Breakfast, Afternoon / Lunch, Evening / Dinner, and Snacks.
+- Added editable exact local logging time with 12-hour display in the diary.
+- Added serving/portion editing with live recalculated calories and macros.
+- Added deletion from inside the editor while preserving the existing quick-delete action.
+- New food and barcode entries now record the local time automatically.
+- Existing v1.9 diary data remains compatible; older entries without a saved time display “Time not set” until edited.
+- Diary items sort chronologically inside each meal section while preserving stable order for entries without a time.
+
+### Reliability and interface
+- Added secure validation for meal period, time, serving amount, and entry identifiers.
+- Added mobile-sized Edit and Delete controls that match the cosmic visual system.
+- Added automated browser coverage for edit, move, time, portion, totals, persistence, and deletion workflows.
+- Updated the PWA cache and asset versions to 1.10.0.
+
 ## v1.9.0 — July 12, 2026
 
 ### Complete visual overhaul

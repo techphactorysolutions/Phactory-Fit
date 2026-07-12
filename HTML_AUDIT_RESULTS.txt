@@ -1,4 +1,6 @@
-PASS HTML parser accepted index.html
-PASS unique IDs: 70 IDs checked
-PASS all four macro gauges present
-PASS branding and slogan present
+PASS: HTML parser accepted index.html
+PASS: unique IDs: 70 IDs checked
+PASS: no nested static forms
+PASS: all four macro gauges present
+PASS: branding and slogan present
+PASS: version 1.10.0 assets present

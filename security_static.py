@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.9.0"
+VERSION = "1.10.0"
 EXPECTED_ZXING_SHA256 = "066bc34edfcdd4a33f0964aeec967752a0dea1ccaf36e58e319ac9fcb5070f6a"
 
 checks: list[tuple[str, bool, str]] = []
@@ -101,9 +101,9 @@ for token in ["CACHEABLE_PATHS", "canonicalCacheKey", "requestUrl.origin !== sel
     check(f"service-worker control present: {token}", token in worker)
 check("service worker does not cache unknown same-origin responses", "if (!CACHEABLE_PATHS.has(requestUrl.pathname))" in worker)
 check("service worker does not cache cross-origin API responses", "requestUrl.origin !== self.location.origin" in worker)
-check("scanner is in required offline shell", "'./zxing-browser.min.js?v=1.9.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
-check("restaurant catalog is in required offline shell", "'./restaurant-foods.js?v=1.9.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
-check("restaurant catalog is same-origin script", 'src="restaurant-foods.js?v=1.9.0"' in index)
+check("scanner is in required offline shell", "'./zxing-browser.min.js?v=1.10.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
+check("restaurant catalog is in required offline shell", "'./restaurant-foods.js?v=1.10.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
+check("restaurant catalog is same-origin script", 'src="restaurant-foods.js?v=1.10.0"' in index)
 check("restaurant catalog is frozen", "Object.freeze" in restaurant_catalog)
 
 # Vendored dependency integrity and lock metadata.

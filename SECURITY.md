@@ -2,11 +2,11 @@
 
 ## Supported release
 
-Security fixes are applied to the latest published release only. The supported release in this package is **PhactoryFit 1.9.0**.
+Security fixes are applied to the latest published release only. The supported release in this package is **PhactoryFit 1.10.0**.
 
 ## Architecture and security boundary
 
-PhactoryFit 1.9.0 is a static, local-first Progressive Web App. It has no account system, server database, authentication cookie, payment flow, private API key, or privileged backend. Nutrition and activity data are stored in the browser under the app's web origin. Packaged-food searches and unknown barcode lookups use read-only Open Food Facts endpoints.
+PhactoryFit 1.10.0 is a static, local-first Progressive Web App. It has no account system, server database, authentication cookie, payment flow, private API key, or privileged backend. Nutrition and activity data are stored in the browser under the app's web origin. Packaged-food searches and unknown barcode lookups use read-only Open Food Facts endpoints.
 
 This means SQL injection, server-side request forgery, broken session management, password theft, and server database exposure are not current attack surfaces. They become relevant immediately if authentication, cloud sync, payments, uploads, or a backend are added and would require a new threat model and penetration test.
 
@@ -64,6 +64,6 @@ No security audit can prove that an application has zero vulnerabilities. The cu
 
 Run a new audit before adding accounts, cloud synchronization, health-record imports, body-photo upload, Apple Health/HealthKit, payments, AI tool execution, administrative panels, or any server-side component.
 
-## Restaurant catalog security in 1.9.0
+## Restaurant catalog security in 1.10.0
 
 `restaurant-foods.js` is a same-origin, read-only static asset included in the explicit service-worker allowlist. It does not execute third-party code, require credentials, or contact restaurant websites at runtime. All catalog text is normalized and escaped through the same rendering defenses used for imported and external product data. Updating the catalog requires normal repository review and the security workflow.
