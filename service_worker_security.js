@@ -37,7 +37,7 @@ global.self = {
 
 global.caches = {
   async open(name) { operations.push(['open', name]); return cache; },
-  async keys() { return ['old-cache', 'phactoryfit-v1.12.0']; },
+  async keys() { return ['old-cache', 'phactoryfit-v1.13.0']; },
   async delete(name) { operations.push(['delete', name]); return true; },
   async match(key) { operations.push(['match', String(key)]); return cacheStore.get(String(key)); },
 };
@@ -71,9 +71,10 @@ async function dispatchFetch(request) {
   await dispatchWait('install');
   const addAll = operations.find(op => op[0] === 'addAll');
   assert(addAll, 'install must precache the required shell');
-  assert(addAll[1].includes('./zxing-browser.min.js?v=1.12.0'), 'scanner must be in the required shell');
-  assert(addAll[1].includes('./app.js?v=1.12.0'), 'app code must be in the required shell');
-  assert(addAll[1].includes('./restaurant-foods-expanded.js?v=1.12.0'), 'expanded restaurant catalog must be in the required shell');
+  assert(addAll[1].includes('./zxing-browser.min.js?v=1.13.0'), 'scanner must be in the required shell');
+  assert(addAll[1].includes('./app.js?v=1.13.0'), 'app code must be in the required shell');
+  assert(addAll[1].includes('./restaurant-foods-expanded.js?v=1.13.0'), 'expanded restaurant catalog must be in the required shell');
+  assert(addAll[1].includes('./restaurant-brands.js?v=1.13.0'), 'restaurant brand registry must be in the required shell');
 
   operations.length = 0;
   await dispatchWait('activate');
@@ -95,7 +96,7 @@ async function dispatchFetch(request) {
   await new Promise(resolve => setImmediate(resolve));
   const codePut = operations.find(op => op[0] === 'put');
   assert(codePut, 'known code assets should update the offline cache');
-  assert.equal(codePut[1], 'https://example.test/phactoryfit/app.js?v=1.12.0');
+  assert.equal(codePut[1], 'https://example.test/phactoryfit/app.js?v=1.13.0');
 
   operations.length = 0;
   await dispatchFetch({method:'GET', mode:'navigate', url:'https://example.test/phactoryfit/SECURITY.md'});
@@ -109,7 +110,7 @@ async function dispatchFetch(request) {
   assert(navPut, 'app navigation should refresh the offline document');
   assert.equal(navPut[1], 'https://example.test/phactoryfit/index.html');
 
-  console.log('PASSED 6/6 service-worker security checks');
+  console.log('PASSED 7/7 service-worker security checks');
 })().catch(error => {
   console.error(error);
   process.exit(1);

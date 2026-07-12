@@ -1,0 +1,1 @@
+PASSED 13/13 restaurant brand registry checks

@@ -1,34 +1,37 @@
-# Restaurant and Food Data Sources — PhactoryFit 1.12.0
+# Restaurant and Food Data Sources — PhactoryFit 1.13.0
 
-## Curated local catalog
+PhactoryFit uses layered sources because no single static dataset can accurately represent every current U.S. restaurant menu.
 
-`restaurant-foods.js` contains 250 hand-curated U.S. menu records across 11 chains. These records preserve source labels, verification dates where available, and partial-nutrient handling.
+## 1. Curated offline records
 
-## Supplemental open restaurant archive
+`restaurant-foods.js` contains selected U.S. menu records reviewed for the app. These are labeled **Verified** in the interface. Menu availability, preparation, and nutrition can still vary by location and customization.
 
-`restaurant-foods-expanded.js` contains 1,098 source records from the MIT-licensed `captn3m0/restaurant-nutrition-data` project. It adds Burger King, Dairy Queen, Hardee's, Little Caesars, Taco John's, Wendy's, and White Castle.
+## 2. Supplemental offline archive
 
-The source repository describes the files as nutrition data from popular restaurants and fast-food chains imported into FoodNoms. The original license is included as `RESTAURANT_ARCHIVE_LICENSE.txt`.
+`restaurant-foods-expanded.js` contains a larger MIT-licensed historical restaurant dataset used by the FoodNoms ecosystem. These records are explicitly labeled **Archive** so older nutrition is not presented as current official restaurant data. See `RESTAURANT_ARCHIVE_LICENSE.txt`.
 
-These records are labeled **Archive** in the interface. They are not represented as current official menus. Some original datasets use source-listed portions or older menu terminology. Users should verify current serving sizes and nutrition with the restaurant.
+## 3. Hidden 422-brand registry
 
-## Open Food Facts
+`restaurant-brands.js` contains the 422 restaurant names supplied for this project, plus normalized aliases. It is used only for search recognition and provider routing. It contains no fabricated nutrition values and is not rendered as a browse-all directory.
 
-Open Food Facts remains the packaged-food and barcode source. It is a collaborative product-label database and is not treated as a complete restaurant-menu system.
+## 4. Phactory Food Cloud live providers
 
-## Optional Phactory Food Cloud
+The optional server gateway in `food-cloud/` can query:
 
-The reference Worker in `food-cloud/` can query:
+- Nutritionix restaurant and branded-food data.
+- FatSecret restaurant, branded, and common foods.
+- USDA FoodData Central branded foods.
 
-- FatSecret Platform API for searchable food and restaurant records.
-- USDA FoodData Central for branded-food records.
+Provider credentials are stored as server secrets. Live results are labeled **Live** and are not persisted by the Worker. Review provider terms before production deployment.
 
-The Worker stores credentials server-side, returns a normalized schema, applies query and response bounds, disables caching, and restricts browser access to the configured app origin. Provider terms, attribution, quotas, and storage restrictions remain the deployer's responsibility.
+## 5. Open Food Facts
 
-## Release totals
+Open Food Facts remains a community packaged-food and barcode fallback. It is not treated as an authoritative restaurant-menu source. Community data should be checked against the package or restaurant nutrition listing.
 
-- Curated local records: 250
-- Supplemental archived records: 1,098
-- Total offline records: 1,348
-- Offline chains: 18
-- Duplicate record IDs: 0
+## Accuracy rules
+
+- Missing nutrients remain unavailable rather than being silently converted to zero.
+- Serving size and quantity are displayed before diary logging.
+- Source quality appears with search results.
+- Current restaurant recipes, limited-time items, region-specific menus, and customizations can change nutrition.
+- The app must not claim universal current-menu completeness unless a provider contract and ongoing verification process support that claim.

@@ -1,6 +1,7 @@
-PASS: HTML parser accepted index.html
-PASS: unique IDs: 70 IDs checked
-PASS: no nested static forms
-PASS: all four macro gauges present
-PASS: branding and slogan present
-PASS: version 1.12.0 assets present
+PASS: HTML parsed without fatal parser error
+PASS: No duplicate element IDs
+PASS: All production scripts are same-origin
+PASS: Food modal host exists
+PASS: App root exists
+IDs: 71; Forms: 1; Buttons: 26; Form controls: 12; Scripts: 6
+RESULT: 5/5 HTML structure checks passed

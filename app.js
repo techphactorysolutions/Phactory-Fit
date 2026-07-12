@@ -1,7 +1,7 @@
 'use strict';
 
 const STORAGE_KEY = 'phactoryfit.v1';
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.13.0';
 const MAX_LOG_ENTRIES_PER_DAY = 5000;
 const MAX_CUSTOM_FOODS = 10000;
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -284,6 +284,8 @@ let barcodeVideoDevices = [];
 let preferredBarcodeDeviceId = '';
 let barcodeCandidate = {code:'', seenAt:0, count:0};
 let modalContext = {meal:'Breakfast', foodSearchQuery:''};
+let foodCloudHealthCache = null;
+let foodCloudHealthCheckedAt = 0;
 let onlineFoodResults = [];
 let onlineFoodQuery = '';
 let onlineFoodLoading = false;
@@ -344,26 +346,7 @@ function findFoodById(id) {
 
 const RESTAURANT_SEARCH_STOP_WORDS = new Set(['a','an','and','at','food','foods','for','from','in','item','items','me','menu','near','n','of','order','restaurant','restaurants','the','tonight','today','tomorrow']);
 
-const RESTAURANT_QUICK_SEARCHES = Object.freeze([
-  {label:"McDonald’s",query:"McDonald's breakfast"},
-  {label:'Burger King',query:'Burger King'},
-  {label:"Wendy’s",query:"Wendy's"},
-  {label:'Chick-fil-A',query:'Chick-fil-A'},
-  {label:'Taco Bell',query:'Taco Bell'},
-  {label:'Subway',query:'Subway'},
-  {label:"Arby’s",query:"Arby's"},
-  {label:'Sonic',query:'Sonic'},
-  {label:'Dairy Queen',query:'Dairy Queen'},
-  {label:'White Castle',query:'White Castle'},
-  {label:'Little Caesars',query:'Little Caesars'},
-  {label:"Hardee’s",query:"Hardee's breakfast"},
-  {label:"Taco John’s",query:"Taco John's"},
-  {label:'Five Guys',query:'Five Guys'},
-  {label:'Buffalo Wild Wings',query:'Buffalo Wild Wings'},
-  {label:'Starbucks',query:'Starbucks breakfast'},
-  {label:'Chipotle',query:'Chipotle'},
-  {label:'Panera Bread',query:'Panera Bread'}
-]);
+
 
 function normalizeSearchText(value = '') {
   let text = String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
@@ -495,14 +478,81 @@ function restaurantLocationLabel() {
   return state.profile.stateCode ? `United States · ${state.profile.stateCode}` : 'United States';
 }
 
-function restaurantDirectoryMarkup() {
-  const counts = new Map();
-  restaurantFoods().forEach(food => counts.set(food.brand, (counts.get(food.brand) || 0) + 1));
-  const chips = RESTAURANT_QUICK_SEARCHES.map(item => {
-    const count = counts.get(item.label.replace('McDonald’s', "McDonald's").replace('Arby’s', "Arby's")) || counts.get(item.label) || 0;
-    return `<button type="button" data-food-search-query="${escapeHtml(item.query)}"><span>${escapeHtml(item.label)}</span>${count ? `<small>${count}</small>` : ''}</button>`;
-  }).join('');
-  return `<section class="restaurant-directory"><div class="food-result-heading"><strong>Browse restaurant menus</strong><small>${counts.size} chains · ${restaurantFoods().length} items</small></div><div class="restaurant-directory-grid">${chips}</div><p class="food-search-attribution">Search by chain, item, meal, size, or a close spelling. The offline catalog combines current curated records with a clearly labeled menu archive; optional Food Cloud results can add live provider coverage.</p></section>`;
+
+
+let normalizedRestaurantBrandsCache = null;
+
+function restaurantBrands() {
+  if (normalizedRestaurantBrandsCache) return normalizedRestaurantBrandsCache;
+  const rows = Array.isArray(window.PHACTORYFIT_RESTAURANT_BRANDS) ? window.PHACTORYFIT_RESTAURANT_BRANDS : [];
+  normalizedRestaurantBrandsCache = rows.map((row, index) => {
+    const name = String(row?.name || '').trim().slice(0, 120);
+    if (!name) return null;
+    const aliases = Array.isArray(row?.aliases) ? row.aliases.map(value => String(value || '').trim().slice(0, 120)).filter(Boolean).slice(0, 20) : [];
+    const forms = [...new Set([name, ...aliases].map(normalizeSearchText).filter(Boolean))];
+    const tokens = [...new Set(forms.flatMap(value => value.split(' ').filter(Boolean)))];
+    return {id:`restaurant-brand-${index}`, name, aliases, forms, tokens};
+  }).filter(Boolean);
+  return normalizedRestaurantBrandsCache;
+}
+
+function recognizedRestaurantBrand(query) {
+  const normalized = normalizeSearchText(query);
+  if (!normalized) return null;
+  const queryTokens = normalized.split(' ').filter(Boolean);
+  let best = null;
+  restaurantBrands().forEach(brand => {
+    let score = 0;
+    brand.forms.forEach(form => {
+      if (normalized === form) score = Math.max(score, 2000 + form.length);
+      else if (normalized.includes(form)) score = Math.max(score, 1600 + form.length);
+      else if (form.includes(normalized) && normalized.length >= 4) score = Math.max(score, 1100 + normalized.length);
+      const formTokens = form.split(' ').filter(Boolean);
+      if (formTokens.length && formTokens.every(token => bestTokenScore(token, queryTokens) >= 0.82)) {
+        const tokenScore = formTokens.reduce((sum, token) => sum + bestTokenScore(token, queryTokens), 0) / formTokens.length;
+        score = Math.max(score, Math.round(700 + tokenScore * 300 + form.length));
+      }
+      const compactQuery = normalized.replace(/\s+/g, '');
+      const compactForm = form.replace(/\s+/g, '');
+      if (compactQuery.length >= 4 && compactForm.length >= 4) {
+        const candidate = compactQuery.length > compactForm.length ? compactQuery.slice(0, Math.min(compactQuery.length, compactForm.length + 4)) : compactQuery;
+        const distance = boundedDamerauDistance(candidate, compactForm, compactForm.length >= 8 ? 2 : 1);
+        if (distance <= (compactForm.length >= 8 ? 2 : 1)) score = Math.max(score, 650 + compactForm.length - distance * 20);
+      }
+    });
+    if (!best || score > best.score) best = score > 0 ? {...brand, score} : best;
+  });
+  return best && best.score >= 650 ? best : null;
+}
+
+function restaurantProviderQuery(query) {
+  const original = String(query || '').trim().slice(0, MAX_FOOD_SEARCH_LENGTH);
+  const brand = recognizedRestaurantBrand(original);
+  if (!brand) return original;
+
+  // Compare the user's literal words to the canonical brand without applying
+  // alias expansion. This prevents shorthand such as "bdubs" from being
+  // mistaken for an already-canonical provider query.
+  const literalNormalize = value => String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+  const literal = literalNormalize(original);
+  const canonical = literalNormalize(brand.name);
+  return literal.includes(canonical)
+    ? original
+    : `${brand.name} ${original}`.slice(0, MAX_FOOD_SEARCH_LENGTH);
+}
+
+function restaurantSearchContextMarkup(query) {
+  const brand = recognizedRestaurantBrand(query);
+  if (!brand) return '';
+  const localCount = restaurantFoods().filter(food => normalizeSearchText(food.brand) === normalizeSearchText(brand.name)).length;
+  return `<div class="recognized-restaurant" role="status"><span>Restaurant recognized</span><strong>${escapeHtml(brand.name)}</strong><small>${localCount ? `${localCount} offline record${localCount === 1 ? '' : 's'} plus live provider search` : 'Live menu search enabled through Phactory Food Cloud'}</small></div>`;
 }
 
 function smartRestaurantFit(food) {
@@ -1033,6 +1083,36 @@ function renderCoach() {
   $('#proteinRescue').innerHTML = rescueFoods.map(food => `<button type="button" class="rescue-item" data-rescue-food="${food.foodId}"><span><strong>${escapeHtml(food.label)}</strong><small>${food.calories} calories</small></span><strong>${food.protein}g</strong></button>`).join('') + (left ? `<p class="fine-print">You have approximately ${round(left)} g remaining today.</p>` : '<p class="fine-print">Protein minimum reached.</p>');
 }
 
+
+async function renderFoodCloudStatus() {
+  const target = $('#foodCloudStatus');
+  if (!target) return;
+  const base = configuredFoodCloudUrl();
+  if (!base) {
+    target.className = 'database-status offline';
+    target.innerHTML = '<strong>Offline catalog active</strong><span>1,348 menu records are available immediately. All 422 requested restaurant brands are recognized, but broad current-menu coverage requires the secure Food Cloud deployment.</span>';
+    return;
+  }
+  if (foodCloudHealthCache && Date.now() - foodCloudHealthCheckedAt < 300000) {
+    const providers = Object.entries(foodCloudHealthCache.providers || {}).filter(([,enabled]) => enabled).map(([name]) => name === 'fatSecret' ? 'FatSecret' : name === 'nutritionix' ? 'Nutritionix' : name.toUpperCase());
+    target.className = `database-status ${providers.length ? 'online' : 'warning'}`;
+    target.innerHTML = `<strong>${providers.length ? 'Live Food Cloud connected' : 'Food Cloud reachable, no providers configured'}</strong><span>${escapeHtml(providers.length ? `${providers.join(', ')} enabled for current restaurant and branded-food searches.` : 'Add provider secrets to the Worker before public menu search can expand beyond the offline catalog.')}</span>`;
+    return;
+  }
+  target.className = 'database-status checking';
+  target.innerHTML = '<strong>Checking Food Cloud…</strong><span>Verifying the secure restaurant-data providers.</span>';
+  try {
+    const response = await fetchWithTimeout(`${base}/health`, 8000);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    foodCloudHealthCache = await readBoundedJson(response, 65536);
+    foodCloudHealthCheckedAt = Date.now();
+    await renderFoodCloudStatus();
+  } catch (error) {
+    target.className = 'database-status error';
+    target.innerHTML = `<strong>Food Cloud unavailable</strong><span>${escapeHtml(error?.message || 'The live menu service could not be reached.')} Offline search remains available.</span>`;
+  }
+}
+
 function populateSettings() {
   const form = $('#settingsForm');
   if (!form) return;
@@ -1042,6 +1122,7 @@ function populateSettings() {
     if (input.type === 'checkbox') input.checked = Boolean(value);
     else input.value = value;
   });
+  renderFoodCloudStatus();
 }
 
 function navigate(view) {
@@ -1158,8 +1239,7 @@ function editDiaryFoodModal(entry) {
 }
 
 function foodModal(meal) {
-  const quickSearches = RESTAURANT_QUICK_SEARCHES.map(item => `<button type="button" data-food-search-query="${escapeHtml(item.query)}">${escapeHtml(item.label)}</button>`).join('');
-  return `<div class="modal-form"><label>Meal<select id="foodMeal">${mealOptions(meal)}</select></label><label>Search foods, brands, or restaurants<input id="foodSearch" type="search" maxlength="120" placeholder="Subway turkey footlong, Arby’s roast beef, Sonic burrito…" autocomplete="off" enterkeyhint="search" spellcheck="false"></label><div class="restaurant-quick-search" aria-label="Popular restaurant searches">${quickSearches}</div><p class="form-note food-search-help">Offline U.S. restaurant matches appear instantly and display a Verified or Archive source label. Search tolerates common aliases, missing punctuation, plural forms, and close spelling. Food Cloud and community matches are searched online after you pause typing.</p><div class="inline-actions"><button type="button" class="secondary-button" id="createFoodButton">Create custom food</button></div><div id="foodResults" class="search-results" aria-live="polite"></div></div>`;
+  return `<div class="modal-form"><label>Meal<select id="foodMeal">${mealOptions(meal)}</select></label><label>Search any U.S. restaurant, menu item, brand, or saved food<input id="foodSearch" type="search" maxlength="120" placeholder="McDonald’s hash brown, Wingstop lemon pepper, Panera soup…" autocomplete="off" enterkeyhint="search" spellcheck="false"></label><p class="form-note food-search-help">Type a restaurant and item. PhactoryFit recognizes 422 U.S. restaurant brands, searches the offline catalog instantly, and can retrieve current provider results through the secure Food Cloud. Menus are generated only from your search—there is no restaurant directory under the search bar.</p><div class="inline-actions"><button type="button" class="secondary-button" id="createFoodButton">Create custom food</button></div><div id="foodResults" class="search-results" aria-live="polite"></div></div>`;
 }
 
 function barcodeModal(meal) {
@@ -1220,7 +1300,7 @@ function renderFoodResults(query) {
     : [];
 
   const sections = [];
-  if (!normalizedQuery) sections.push(restaurantDirectoryMarkup());
+  if (normalizedQuery) sections.push(restaurantSearchContextMarkup(query));
   if (recentRestaurantFoods.length) {
     sections.push(`<div class="food-result-section restaurant-food-section"><div class="food-result-heading"><strong>Recent restaurant items</strong><small>${escapeHtml(restaurantLocationLabel())}</small></div>${recentRestaurantFoods.map(food => foodSearchResultButton(food, 'restaurant')).join('')}</div>`);
   }
@@ -1232,16 +1312,16 @@ function renderFoodResults(query) {
   }
   if (normalizedQuery.length >= 2) {
     if (onlineFoodLoading && onlineFoodQuery === String(query || '').trim().toLowerCase()) {
-      sections.push('<div class="food-search-status"><span class="search-spinner" aria-hidden="true"></span><span>Searching Phactory Food Cloud and community databases…</span></div>');
+      sections.push('<div class="food-search-status"><span class="search-spinner" aria-hidden="true"></span><span>Searching live restaurant menus, branded foods, and community databases…</span></div>');
     } else if (onlineFoods.length) {
-      sections.push(`<div class="food-result-section online-food-section"><div class="food-result-heading"><strong>Expanded online matches</strong><small>Food Cloud + Open Food Facts</small></div>${onlineFoods.slice(0, 24).map(food => foodSearchResultButton(food, 'online')).join('')}<p class="food-search-attribution">Source quality is shown on each result. Verify restaurant customizations and community nutrition before relying on it.</p></div>`);
+      sections.push(`<div class="food-result-section online-food-section"><div class="food-result-heading"><strong>Live and expanded matches</strong><small>Nutrition providers + Open Food Facts</small></div>${onlineFoods.slice(0, 24).map(food => foodSearchResultButton(food, 'online')).join('')}<p class="food-search-attribution">Source quality is shown on each result. Verify restaurant customizations and community nutrition before relying on it.</p></div>`);
     } else if (onlineFoodError && onlineFoodQuery === String(query || '').trim().toLowerCase()) {
       sections.push(`<div class="food-search-status error"><span>${escapeHtml(onlineFoodError)}</span><button type="button" class="text-button" id="retryFoodSearch">Retry</button></div>`);
     } else if (onlineFoodQuery === String(query || '').trim().toLowerCase() && !restaurantMatches.length) {
-      sections.push('<p class="form-note">No restaurant or community-food match was found. Try a shorter chain or item name, check the spelling, or create a custom food.</p>');
+      sections.push('<p class="form-note">No matching menu item was found. Try the exact restaurant name plus the item or size. If the restaurant is recognized but no live result appears, verify that Phactory Food Cloud is deployed and connected.</p>');
     }
   }
-  target.innerHTML = sections.join('') || '<p class="form-note">Search a restaurant, menu item, brand, or saved food. Browse a chain below or type at least two letters.</p>';
+  target.innerHTML = sections.join('') || '<p class="form-note">Start typing a restaurant or food item. Results are generated from your search.</p>';
 }
 function productNutrientExists(product, names) {
   const nutrition = product?.nutriments || product?.nutrition || {};
@@ -1263,6 +1343,29 @@ function productHasNutrition(product) {
 
 function foodSearchBrandTag(query) {
   return String(query || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+
+function onlineFoodRelevanceScore(food, query) {
+  const normalized = normalizeSearchText(query);
+  const tokens = foodSearchTokens(query);
+  const brand = recognizedRestaurantBrand(query);
+  const foodName = normalizeSearchText(food?.name);
+  const foodBrand = normalizeSearchText(food?.brand);
+  const candidateTokens = foodSearchTokens(`${food?.brand || ''} ${food?.name || ''} ${food?.serving || ''}`);
+  let score = 0;
+  if (foodName === normalized) score += 500;
+  if (normalized && foodName.includes(normalized)) score += 240;
+  tokens.forEach(token => { score += bestTokenScore(token, candidateTokens) * 80; });
+  if (brand) {
+    const brandForms = brand.forms || [normalizeSearchText(brand.name)];
+    const brandMatched = brandForms.some(form => foodBrand.includes(form) || form.includes(foodBrand) || normalizeSearchText(`${foodBrand} ${foodName}`).includes(form));
+    score += brandMatched ? 700 : -250;
+  }
+  if (food?.dataQuality === 'live-provider') score += 150;
+  if (food?.restaurant) score += 80;
+  if (nutrientAvailable(food, 'protein')) score += Math.min(60, Number(food.protein || 0));
+  return score;
 }
 
 function rememberFoodSearch(query, foods) {
@@ -1300,7 +1403,8 @@ function normalizeFoodCloudResult(raw, index = 0) {
 async function fetchFoodCloudSearch(query) {
   const base = configuredFoodCloudUrl();
   if (!base) return [];
-  const url = `${base}/v1/search?q=${encodeURIComponent(String(query || '').slice(0, MAX_FOOD_SEARCH_LENGTH))}&region=US&limit=50`;
+  const providerQuery = restaurantProviderQuery(query);
+  const url = `${base}/v1/search?q=${encodeURIComponent(providerQuery)}&region=US&limit=50`;
   const response = await fetchWithTimeout(url, 14000);
   if (!response.ok) throw new Error(`Food Cloud HTTP ${response.status}`);
   const payload = await readBoundedJson(response);
@@ -1365,7 +1469,11 @@ async function fetchOnlineFoodSearch(query) {
     }
   }
   if (!merged.length && lastError) throw lastError;
-  const result = merged.slice(0, 60);
+  const result = merged
+    .map(food => ({food, score:onlineFoodRelevanceScore(food, normalized)}))
+    .sort((first, second) => second.score - first.score || String(first.food.name).localeCompare(String(second.food.name)))
+    .slice(0, 60)
+    .map(row => row.food);
   rememberFoodSearch(cacheKey, result);
   return result;
 }
@@ -1701,7 +1809,7 @@ function barcodeCameraErrorMessage(error) {
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'The camera is busy or unavailable. Close other camera apps, return to PhactoryFit, and try again.';
   if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The requested rear-camera mode was unavailable. PhactoryFit will retry with simpler camera settings.';
-  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.12.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
+  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.13.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
   if (name === 'TimeoutError') return 'No barcode was detected. Hold the package 6–10 inches away, avoid glare, and keep the entire barcode inside the frame.';
   return 'The barcode camera could not start. Check camera permission, lighting, and the secure HTTPS address, then try again.';
 }

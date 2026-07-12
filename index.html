@@ -12,10 +12,10 @@
   <meta name="apple-mobile-web-app-title" content="PhactoryFit">
   <meta name="description" content="PhactoryFit — private, adaptive nutrition and fitness tracking.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=1.12.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=1.13.0">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="apple-touch-icon-precomposed" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=1.12.0">
+  <link rel="stylesheet" href="styles.css?v=1.13.0">
   <title>PhactoryFit</title>
 </head>
 <body>
@@ -171,13 +171,19 @@
           <label class="toggle-row"><span><strong>Count exercise calories</strong><small>Off by default to prevent accidental overeating</small></span><input name="eatBackExercise" type="checkbox"></label>
           <button class="primary-button" type="submit">Save goals</button>
         </form>
+        <section class="section-card database-status-card">
+          <div class="section-title"><div><p class="muted">Restaurant database</p><h3>Menu coverage status</h3></div><span class="badge">422 brands</span></div>
+          <div id="foodCloudStatus" class="database-status" aria-live="polite"></div>
+          <p class="fine-print">The restaurant brand registry is local and hidden from the search screen. Current menu nutrition is retrieved only after a user searches. Provider credentials remain on the separately deployed Food Cloud server.</p>
+        </section>
+
         <section class="section-card">
           <div class="section-title"><div><p class="muted">Your data</p><h3>Backup and privacy</h3></div></div>
           <p class="body-copy">Your diary stays in this browser unless you export it. PhactoryFit has no account system, analytics, advertising SDK, or private API key.</p>
           <details class="privacy-details"><summary>What leaves this device?</summary><p>Camera frames and barcode photos are processed locally and are not uploaded. When you search packaged foods or scan an unknown barcode, the search text or barcode number may be sent to Open Food Facts. If the optional Phactory Food Cloud is configured, search text is also sent to that endpoint to retrieve expanded restaurant and food matches. Voice search is provided by Safari and may use Apple's online speech-processing service.</p><p>For strongest privacy on GitHub Pages, deploy PhactoryFit on a dedicated custom domain so its browser storage is isolated from other projects on the same <code>github.io</code> origin. See <a href="PRIVACY.md" target="_blank" rel="noopener noreferrer">PRIVACY.md</a> and <a href="SECURITY.md" target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</p></details>
           <div class="button-stack"><button type="button" id="exportButton" class="secondary-button">Export backup</button><label class="secondary-button file-label">Import backup<input id="importInput" type="file" accept="application/json,.json"></label><button type="button" id="resetButton" class="danger-button">Reset local data</button></div>
         </section>
-        <p class="branding">Designed by Tech Phactory Solutions<br><span>Version 1.12.0 · Universal Food Search · 1,348 offline U.S. restaurant records + optional secure Food Cloud</span></p>
+        <p class="branding">Designed by Tech Phactory Solutions<br><span>Version 1.13.0 · Universal Food Search · 1,348 offline menu records · 422-brand restaurant recognition · secure live Food Cloud</span></p>
       </section>
     </main>
 
@@ -199,11 +205,12 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="config.js?v=1.12.0" defer></script>
-  <script src="restaurant-foods.js?v=1.12.0" defer></script>
-  <script src="restaurant-foods-expanded.js?v=1.12.0" defer></script>
+  <script src="config.js?v=1.13.0" defer></script>
+  <script src="restaurant-foods.js?v=1.13.0" defer></script>
+  <script src="restaurant-foods-expanded.js?v=1.13.0" defer></script>
+  <script src="restaurant-brands.js?v=1.13.0" defer></script>
   <!-- Exact vendored @zxing/browser 0.2.1. See VENDOR_LOCK.json and ZXING_LICENSE.txt. -->
-  <script src="zxing-browser.min.js?v=1.12.0" defer></script>
-  <script src="app.js?v=1.12.0" defer></script>
+  <script src="zxing-browser.min.js?v=1.13.0" defer></script>
+  <script src="app.js?v=1.13.0" defer></script>
 </body>
 </html>

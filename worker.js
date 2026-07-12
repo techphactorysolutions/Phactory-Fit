@@ -7,6 +7,7 @@
  * Supported optional providers:
  *   - FatSecret Platform API: FATSECRET_CLIENT_ID / FATSECRET_CLIENT_SECRET
  *   - USDA FoodData Central: USDA_API_KEY
+ *   - Nutritionix: NUTRITIONIX_APP_ID / NUTRITIONIX_API_KEY
  *
  * Review each provider's current license and storage rules before production use.
  */
@@ -123,6 +124,103 @@ async function searchFatSecret(query, env, limit) {
   return (Array.isArray(rows) ? rows : [rows]).map(normalizeFatSecret).filter(Boolean);
 }
 
+
+function nutritionixHeaders(env) {
+  if (!env.NUTRITIONIX_APP_ID || !env.NUTRITIONIX_API_KEY) return null;
+  return {
+    'x-app-id': String(env.NUTRITIONIX_APP_ID),
+    'x-app-key': String(env.NUTRITIONIX_API_KEY),
+    'x-remote-user-id': 'phactoryfit-public',
+    accept: 'application/json'
+  };
+}
+
+function normalizeNutritionix(food, index) {
+  const name = compact(food?.food_name || food?.name);
+  if (!name) return null;
+  const servingQty = number(food?.serving_qty || 1) || 1;
+  const servingUnit = compact(food?.serving_unit || 'serving', 40);
+  const servingWeight = number(food?.serving_weight_grams);
+  const serving = servingWeight
+    ? `${servingQty} ${servingUnit} (${servingWeight} g)`
+    : `${servingQty} ${servingUnit}`;
+  const availableNutrients = [];
+  const fieldMap = {
+    calories:'nf_calories', protein:'nf_protein', carbs:'nf_total_carbohydrate', fat:'nf_total_fat',
+    fiber:'nf_dietary_fiber', sugar:'nf_sugars', saturatedFat:'nf_saturated_fat',
+    transFat:'nf_trans_fatty_acid', cholesterol:'nf_cholesterol', sodium:'nf_sodium'
+  };
+  Object.entries(fieldMap).forEach(([key, field]) => {
+    if (Number.isFinite(Number(food?.[field]))) availableNutrients.push(key);
+  });
+  return {
+    id: `nutritionix-${compact(food?.nix_item_id || food?.tag_id || index, 100)}`,
+    name,
+    brand: compact(food?.brand_name || 'Nutritionix restaurant / brand'),
+    serving,
+    calories: number(food?.nf_calories),
+    protein: number(food?.nf_protein),
+    carbs: number(food?.nf_total_carbohydrate),
+    fat: number(food?.nf_total_fat),
+    fiber: number(food?.nf_dietary_fiber),
+    sugar: number(food?.nf_sugars),
+    saturatedFat: number(food?.nf_saturated_fat),
+    transFat: number(food?.nf_trans_fatty_acid),
+    cholesterol: number(food?.nf_cholesterol),
+    sodium: number(food?.nf_sodium),
+    restaurant: true,
+    region: 'US',
+    source: 'Nutritionix Restaurant Database',
+    dataQuality: 'live-provider',
+    availableNutrients,
+    availability: 'Live provider result. Verify the current restaurant location, size, recipe, and customizations.'
+  };
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({length: Math.min(concurrency, items.length)}, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      try { results[index] = await mapper(items[index], index); }
+      catch (error) { results[index] = null; }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+async function nutritionixItem(item, env) {
+  const headers = nutritionixHeaders(env);
+  if (!headers || !item?.nix_item_id) return item;
+  const url = new URL('https://trackapi.nutritionix.com/v2/search/item');
+  url.searchParams.set('nix_item_id', compact(item.nix_item_id, 120));
+  const response = await fetch(url, {headers, redirect:'error'});
+  if (!response.ok) throw new Error(`Nutritionix item ${response.status}`);
+  const payload = await boundedJson(response);
+  return Array.isArray(payload?.foods) && payload.foods[0] ? payload.foods[0] : item;
+}
+
+async function searchNutritionix(query, env, limit) {
+  const headers = nutritionixHeaders(env);
+  if (!headers) return [];
+  const url = new URL('https://trackapi.nutritionix.com/v2/search/instant');
+  url.searchParams.set('query', query);
+  url.searchParams.set('branded', 'true');
+  url.searchParams.set('common', 'false');
+  url.searchParams.set('self', 'false');
+  const response = await fetch(url, {headers, redirect:'error'});
+  if (!response.ok) throw new Error(`Nutritionix search ${response.status}`);
+  const payload = await boundedJson(response);
+  const rows = (Array.isArray(payload?.branded) ? payload.branded : []).slice(0, Math.min(limit, 18));
+  const details = await mapWithConcurrency(rows, 4, async row => {
+    const hasMacros = ['nf_calories','nf_protein','nf_total_carbohydrate','nf_total_fat'].every(field => Number.isFinite(Number(row?.[field])));
+    return hasMacros ? row : nutritionixItem(row, env);
+  });
+  return details.map(normalizeNutritionix).filter(food => food && food.calories > 0);
+}
+
 function nutrientValue(food, names) {
   const nutrients = Array.isArray(food?.foodNutrients) ? food.foodNutrients : [];
   for (const nutrient of nutrients) {
@@ -183,6 +281,18 @@ function dedupe(foods) {
   });
 }
 
+
+async function rateLimitAllowed(request, env) {
+  if (!env.RATE_LIMITER || typeof env.RATE_LIMITER.limit !== 'function') return true;
+  const key = compact(request.headers.get('CF-Connecting-IP') || 'unknown', 100);
+  try {
+    const result = await env.RATE_LIMITER.limit({key});
+    return Boolean(result?.success);
+  } catch (error) {
+    return true;
+  }
+}
+
 export default {
   async fetch(request, env) {
     const cors = corsHeaders(request, env);
@@ -190,7 +300,8 @@ export default {
     if (request.method !== 'GET') return json({error: 'Method not allowed'}, 405, cors);
 
     const url = new URL(request.url);
-    if (url.pathname === '/health') return json({ok: true, providers: {fatSecret: Boolean(env.FATSECRET_CLIENT_ID && env.FATSECRET_CLIENT_SECRET), usda: Boolean(env.USDA_API_KEY)}}, 200, cors);
+    if (!(await rateLimitAllowed(request, env))) return json({error:'Rate limit exceeded'}, 429, {...cors, 'retry-after':'60'});
+    if (url.pathname === '/health') return json({ok: true, providers: {nutritionix: Boolean(env.NUTRITIONIX_APP_ID && env.NUTRITIONIX_API_KEY), fatSecret: Boolean(env.FATSECRET_CLIENT_ID && env.FATSECRET_CLIENT_SECRET), usda: Boolean(env.USDA_API_KEY)}}, 200, cors);
     if (url.pathname !== '/v1/search') return json({error: 'Not found'}, 404, cors);
 
     const query = compact(url.searchParams.get('q'), MAX_QUERY);
@@ -198,6 +309,7 @@ export default {
     if (query.length < 2) return json({foods: [], query}, 200, cors);
 
     const settled = await Promise.allSettled([
+      searchNutritionix(query, env, limit),
       searchFatSecret(query, env, limit),
       searchUsda(query, env, limit)
     ]);

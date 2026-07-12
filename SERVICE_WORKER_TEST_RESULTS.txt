@@ -1,1 +1,1 @@
-PASSED 6/6 service-worker security checks
+PASSED 7/7 service-worker security checks

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.12.0"
+VERSION = "1.13.0"
 EXPECTED_ZXING_SHA256 = "066bc34edfcdd4a33f0964aeec967752a0dea1ccaf36e58e319ac9fcb5070f6a"
 
 checks: list[tuple[str, bool, str]] = []
@@ -25,6 +25,7 @@ index = read("index.html")
 app = read("app.js")
 restaurant_catalog = read("restaurant-foods.js")
 expanded_restaurant_catalog = read("restaurant-foods-expanded.js")
+restaurant_brands = read("restaurant-brands.js")
 worker = read("service-worker.js")
 config = read("config.js")
 manifest = json.loads(read("manifest.webmanifest"))
@@ -33,7 +34,7 @@ package = json.loads(read("package.json"))
 lock = json.loads(read("package-lock.json"))
 
 required_files = [
-    "index.html", "styles.css", "app.js", "config.js", "restaurant-foods.js", "restaurant-foods-expanded.js", "service-worker.js",
+    "index.html", "styles.css", "app.js", "config.js", "restaurant-foods.js", "restaurant-foods-expanded.js", "restaurant-brands.js", "service-worker.js",
     "manifest.webmanifest", "zxing-browser.min.js", "PRIVACY.md", "SECURITY.md",
     "THREAT_MODEL.md", "VENDOR_LOCK.json", "package.json", "package-lock.json",
 ]
@@ -69,7 +70,7 @@ check("external links use noopener", all('rel="noopener noreferrer"' in tag for 
 # No remote executable code or dangerous dynamic execution in first-party code.
 script_srcs = re.findall(r'<script\b[^>]*\bsrc=["\']([^"\']+)', index, re.I)
 check("all scripts are same-origin relative", bool(script_srcs) and all(not re.match(r'^[a-z]+:|^//', src, re.I) for src in script_srcs), str(script_srcs))
-first_party = "\n".join([index, app, restaurant_catalog, expanded_restaurant_catalog, worker, config])
+first_party = "\n".join([index, app, restaurant_catalog, expanded_restaurant_catalog, restaurant_brands, worker, config])
 for pattern, label in [
     (r'\beval\s*\(', "eval"),
     (r'\bnew\s+Function\s*\(', "new Function"),
@@ -102,13 +103,18 @@ for token in ["CACHEABLE_PATHS", "canonicalCacheKey", "requestUrl.origin !== sel
     check(f"service-worker control present: {token}", token in worker)
 check("service worker does not cache unknown same-origin responses", "if (!CACHEABLE_PATHS.has(requestUrl.pathname))" in worker)
 check("service worker does not cache cross-origin API responses", "requestUrl.origin !== self.location.origin" in worker)
-check("scanner is in required offline shell", "'./zxing-browser.min.js?v=1.12.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
-check("restaurant catalog is in required offline shell", "'./restaurant-foods.js?v=1.12.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
-check("restaurant catalog is same-origin script", 'src="restaurant-foods.js?v=1.12.0"' in index)
+check("scanner is in required offline shell", "'./zxing-browser.min.js?v=1.13.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
+check("restaurant catalog is in required offline shell", "'./restaurant-foods.js?v=1.13.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
+check("restaurant catalog is same-origin script", 'src="restaurant-foods.js?v=1.13.0"' in index)
 check("restaurant catalog is frozen", "Object.freeze" in restaurant_catalog)
-check("expanded restaurant catalog is in required offline shell", "'./restaurant-foods-expanded.js?v=1.12.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
-check("expanded restaurant catalog is same-origin script", 'src="restaurant-foods-expanded.js?v=1.12.0"' in index)
+check("expanded restaurant catalog is in required offline shell", "'./restaurant-foods-expanded.js?v=1.13.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
+check("expanded restaurant catalog is same-origin script", 'src="restaurant-foods-expanded.js?v=1.13.0"' in index)
 check("expanded restaurant catalog is frozen", "Object.freeze" in expanded_restaurant_catalog)
+check("restaurant brand registry is in required offline shell", "'./restaurant-brands.js?v=1.13.0'" in worker.split("const OPTIONAL_SHELL", 1)[0])
+check("restaurant brand registry is same-origin script", 'src="restaurant-brands.js?v=1.13.0"' in index)
+check("restaurant brand registry is frozen", "Object.freeze" in restaurant_brands)
+check("restaurant directory removed from blank search", "restaurantDirectoryMarkup" not in app and "Browse restaurant menus" not in app)
+check("Nutritionix secrets are not in public config", all(token not in config for token in ["NUTRITIONIX_APP_ID", "NUTRITIONIX_API_KEY"]))
 check("Food Cloud keys are not in public config", all(token not in config for token in ["FATSECRET_CLIENT_SECRET", "USDA_API_KEY"]))
 
 # Vendored dependency integrity and lock metadata.

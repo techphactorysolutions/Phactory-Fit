@@ -6,6 +6,8 @@ compatibility_date = "2026-07-12"
 APP_ORIGIN = "https://YOUR-GITHUB-USERNAME.github.io"
 
 # Store provider credentials with `wrangler secret put`, never in this file:
+# wrangler secret put NUTRITIONIX_APP_ID
+# wrangler secret put NUTRITIONIX_API_KEY
 # wrangler secret put FATSECRET_CLIENT_ID
 # wrangler secret put FATSECRET_CLIENT_SECRET
 # wrangler secret put USDA_API_KEY

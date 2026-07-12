@@ -2,7 +2,7 @@
   "id": "./",
   "name": "PhactoryFit",
   "short_name": "PhactoryFit",
-  "description": "Private, adaptive nutrition and fitness tracking by Tech Phactory Solutions.",
+  "description": "Private, adaptive nutrition and fitness tracking with 422-brand U.S. restaurant recognition by Tech Phactory Solutions.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

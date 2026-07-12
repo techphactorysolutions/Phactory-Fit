@@ -63,17 +63,33 @@ async def main():
             assert any(any(fragment.lower() in name.lower() for fragment in expected) for name in names), (query, names[:10])
             passed += 1; print(f"PASS search: {query}")
 
-        # 12. Search UI labels archived data and lists the expanded directory.
+        # 12. Search UI removes the browse-all directory, recognizes the requested brand, and labels archived data.
         await page.evaluate("openModal('food')")
-        directory = await page.locator('.restaurant-directory').inner_text()
-        assert "18 chains" in directory and "1348 items" in directory, directory
+        assert await page.locator('.restaurant-directory').count() == 0
+        assert await page.locator('.restaurant-quick-search').count() == 0
         await page.fill('#foodSearch', 'bk whopper')
+        await page.wait_for_selector('.recognized-restaurant')
+        recognized = await page.locator('.recognized-restaurant').inner_text()
+        assert 'Burger King' in recognized, recognized
         await page.wait_for_selector('.food-source-badge.archived-menu')
         badge = await page.locator('.food-source-badge.archived-menu').first.evaluate('(el) => ({text:el.textContent, html:el.outerHTML})')
         assert 'Archive' in badge['text']
-        passed += 1; print("PASS source-quality badges and directory")
+        passed += 1; print("PASS brand recognition, hidden directory, and source-quality badge")
 
-        # 13. Official item serving math and diary logging remain correct.
+        # 13. A provider-only requested brand is recognized and canonicalized without rendering a directory.
+        await page.fill('#foodSearch', 'Wingstop lemon pepper')
+        await page.wait_for_selector('.recognized-restaurant')
+        provider_only = await page.evaluate("""() => ({
+          recognized: document.querySelector('.recognized-restaurant')?.textContent || '',
+          providerQuery: restaurantProviderQuery('bdubs boneless wings'),
+          directoryCount: document.querySelectorAll('.restaurant-directory, .restaurant-quick-search').length
+        })""")
+        assert 'Wingstop' in provider_only['recognized'], provider_only
+        assert provider_only['providerQuery'].startswith('Buffalo Wild Wings'), provider_only
+        assert provider_only['directoryCount'] == 0, provider_only
+        passed += 1; print("PASS provider-only brand recognition and canonical query routing")
+
+        # 14. Official item serving math and diary logging remain correct.
         await page.fill('#foodSearch', "McDonald's breakfast")
         await page.locator('[data-food-id="restaurant-mcd-egg-mcmuffin"]').click()
         await page.fill('#foodQuantityInput', '2')
@@ -83,7 +99,7 @@ async def main():
         assert await page.locator('#caloriesConsumed').inner_text() == '620'
         passed += 1; print("PASS serving math and diary log")
 
-        # 14. Food Cloud configuration stays off by default and blocks unsafe origins.
+        # 15. Food Cloud configuration stays off by default and blocks unsafe origins.
         cloud = await page.evaluate("""() => {
           const original = window.PHACTORYFIT_CONFIG;
           const unsafe = configuredFoodCloudUrl();

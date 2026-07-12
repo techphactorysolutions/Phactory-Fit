@@ -4,6 +4,7 @@ PASS: required file: app.js
 PASS: required file: config.js
 PASS: required file: restaurant-foods.js
 PASS: required file: restaurant-foods-expanded.js
+PASS: required file: restaurant-brands.js
 PASS: required file: service-worker.js
 PASS: required file: manifest.webmanifest
 PASS: required file: zxing-browser.min.js
@@ -13,10 +14,10 @@ PASS: required file: THREAT_MODEL.md
 PASS: required file: VENDOR_LOCK.json
 PASS: required file: package.json
 PASS: required file: package-lock.json
-PASS: version 1.12.0 in index.html
-PASS: version 1.12.0 in app.js
-PASS: version 1.12.0 in service-worker.js
-PASS: version 1.12.0 in package.json
+PASS: version 1.13.0 in index.html
+PASS: version 1.13.0 in app.js
+PASS: version 1.13.0 in service-worker.js
+PASS: version 1.13.0 in package.json
 PASS: manifest start_url is relative
 PASS: manifest scope is relative
 PASS: manifest standalone display
@@ -76,6 +77,11 @@ PASS: restaurant catalog is frozen
 PASS: expanded restaurant catalog is in required offline shell
 PASS: expanded restaurant catalog is same-origin script
 PASS: expanded restaurant catalog is frozen
+PASS: restaurant brand registry is in required offline shell
+PASS: restaurant brand registry is same-origin script
+PASS: restaurant brand registry is frozen
+PASS: restaurant directory removed from blank search
+PASS: Nutritionix secrets are not in public config
 PASS: Food Cloud keys are not in public config
 PASS: ZXing bundle SHA-256 matches audited upstream
 PASS: vendor lock hash matches file
@@ -88,4 +94,4 @@ PASS: no detected AWS access key
 PASS: no detected Google API key
 PASS: no detected generic hard-coded secret
 
-RESULT: 89/89 checks passed
+RESULT: 95/95 checks passed

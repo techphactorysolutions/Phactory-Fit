@@ -1,0 +1,437 @@
+# PhactoryFit Restaurant Brand Coverage — v1.13.0
+
+PhactoryFit recognizes the 422 U.S. restaurant brands below. The registry is a hidden search index; it is not displayed as a browse-all list beneath the food search field.
+
+Recognition means the app can identify a restaurant name or common alias, prioritize matching offline records, and route the canonical restaurant name to the secure Phactory Food Cloud. It does **not** claim that every current menu item is permanently bundled in the static GitHub Pages package. Current menus require an enabled live provider because menus, recipes, sizes, regional availability, and nutrition change.
+
+## Requested brands (422)
+
+- &pizza
+- 4 Rivers Smokehouse
+- 7 Brew Coffee
+- A&W Restaurants
+- Amato’s
+- Andy’s Frozen Custard
+- Anthony’s Coal Fired Pizza
+- Applebee’s
+- Arby’s
+- Arctic Circle
+- Aroma Joe’s
+- Arthur Treacher’s
+- Au Bon Pain
+- Auntie Anne’s
+- Back Yard Burgers
+- Bad Ass Coffee of Hawaii
+- Bahama Buck’s
+- Baja Fresh
+- Baker’s Drive-Thru
+- Bandana’s Bar-B-Q
+- Barberitos
+- Baskin-Robbins
+- bb.q Chicken
+- Ben & Jerry’s
+- Bibibop Asian Grill
+- Big Boy
+- Biggby Coffee
+- Billy Sims Barbecue
+- Biscuitville
+- BJ’s Restaurant & Brewhouse
+- Black Rock Coffee Bar
+- Blake’s Lotaburger
+- Blaze Pizza
+- Blimpie
+- Bojangles
+- Bonchon
+- Boston Market
+- Braum’s
+- Brown’s Chicken & Pasta
+- Bruegger’s Bagels
+- Bruster’s Real Ice Cream
+- Bubbakoo’s Burritos
+- Buffalo Wild Wings
+- Bumper’s Drive-In
+- Burger King
+- Burger Street
+- BurgerFi
+- Burgerville
+- Bush’s Chicken
+- Cafe Yumm!
+- Café Rio
+- Café Zupas
+- California Fish Grill
+- California Tortilla
+- Capriotti’s Sandwich Shop
+- Captain D’s
+- Caribou Coffee
+- Carl’s Jr.
+- Carvel
+- Casey’s
+- CAVA
+- Champs Chicken
+- Charleys Cheesesteaks
+- Cheba Hut
+- Checkers
+- The Cheesecake Factory
+- Chester’s Chicken
+- Chick-fil-A
+- Chicken Express
+- Chicken Guy!
+- Chicken Kitchen
+- Chicken Salad Chick
+- Chili’s
+- Chipotle Mexican Grill
+- Chopt Creative Salad Co.
+- Chowking
+- Chronic Tacos
+- Church’s Texas Chicken
+- Cicis Pizza
+- Cinnabon
+- City Barbeque
+- Clean Eatz
+- Cluck-U Chicken
+- The Coffee Bean & Tea Leaf
+- Coffee Beanery
+- Cold Stone Creamery
+- Cook Out
+- CoreLife Eatery
+- Corner Bakery Cafe
+- Costa Vida
+- Cousins Subs
+- Cracker Barrel
+- Crumbl
+- Culver’s
+- Cumberland Farms
+- Cupbop
+- Dairy Queen
+- Daphne’s California Greek
+- Dave & Buster’s
+- Dave’s Hot Chicken
+- Daylight Donuts
+- Del Taco
+- Denny’s
+- DiBella’s Subs
+- Dickey’s Barbecue Pit
+- Dinosaur Bar-B-Que
+- Dippin’ Dots
+- District Taco
+- Dog Haus
+- Domino’s
+- Donatos Pizza
+- Dos Toros
+- Dreamland Bar-B-Que
+- Duchess
+- Duck Donuts
+- Dunkin’
+- Dunn Brothers Coffee
+- Dutch Bros
+- D’Angelo Grilled Sandwiches
+- Earl of Sandwich
+- Eegee’s
+- Einstein Bros. Bagels
+- El Pollo Loco
+- El Taco Tote
+- Ellianos Coffee
+- Erbert & Gerbert’s
+- Famous Dave’s
+- Farmer Boys
+- Fatburger
+- Figaro’s Pizza
+- Firehouse Subs
+- First Watch
+- Five Daughters Bakery
+- Five Guys
+- Flame Broiler
+- Fosters Freeze
+- Fox’s Pizza Den
+- Freddy’s Frozen Custard & Steakburgers
+- Freebirds World Burrito
+- Freshii
+- Frisch’s Big Boy
+- Fuddruckers
+- Fuzzy’s Taco Shop
+- Gandolfo’s New York Delicatessen
+- Garbanzo Mediterranean Fresh
+- Genghis Grill
+- Gloria Jean’s Coffees
+- Godfather’s Pizza
+- Gold Star Chili
+- Golden Chick
+- Golden Corral
+- Golden Spoon
+- Gong Cha
+- Good Times Burgers & Frozen Custard
+- Graeter’s
+- Grandy’s
+- Great American Cookies
+- The Great Greek Mediterranean Grill
+- Great Harvest Bread Company
+- Great Wraps
+- Green Burrito
+- Gregorys Coffee
+- Griff’s Hamburgers
+- Guthrie’s
+- H. Salt Esquire
+- The Habit Burger Grill
+- The Halal Guys
+- Handel’s Homemade Ice Cream
+- Happy Lemon
+- Harold’s Chicken
+- Hartz Chicken Buffet
+- Hawaiian Bros Island Grill
+- Heine Brothers’ Coffee
+- Honey Dew Donuts
+- honeygrow
+- Hooters
+- Hot Dog on a Stick
+- HTeaO
+- Huddle House
+- Huey Magoo’s
+- The Human Bean
+- Hummus Republic
+- Hungry Howie’s
+- Hunt Brothers Pizza
+- Hwy 55 Burgers Shakes & Fries
+- Häagen-Dazs Shops
+- IHOP
+- Ike’s Love & Sandwiches
+- Illegal Pete’s
+- In-N-Out Burger
+- Insomnia Cookies
+- It’s Boba Time
+- Jack in the Box
+- Jack’s
+- Jamba
+- James Coney Island
+- Jason’s Deli
+- Jeremiah’s Italian Ice
+- Jersey Mike’s
+- Jet’s Pizza
+- Jim ’N Nick’s
+- Jimmy John’s
+- Johnny Rockets
+- Jollibee
+- Juice It Up!
+- Just Salad
+- Kewpee
+- KFC
+- Kilwins
+- Kona Ice
+- Krispy Kreme
+- Krispy Krunchy Chicken
+- Krystal
+- Kung Fu Tea
+- Kwik Trip/Kwik Star
+- L&L Hawaiian Barbecue
+- La Colombe Coffee
+- La Madeleine
+- La Salsa
+- LaMar’s Donuts
+- LaRosa’s Pizzeria
+- Le Pain Quotidien
+- Ledo Pizza
+- Leeann Chin
+- Lee’s Famous Recipe Chicken
+- Lennys Grill & Subs
+- Lion’s Choice
+- Little Caesars
+- Long John Silver’s
+- LongHorn Steakhouse
+- Louisiana Famous Fried Chicken
+- Lucille’s Smokehouse Bar-B-Que
+- Luna Grill
+- MAD Greens
+- MaggieMoo’s
+- Maid-Rite
+- Manchu Wok
+- Marble Slab Creamery
+- Marco’s Pizza
+- Martin’s Bar-B-Que Joint
+- Mazzio’s Italian Eatery
+- McAlister’s Deli
+- McDonald’s
+- Meadows Frozen Custard
+- Menchie’s
+- Mendocino Farms
+- Mighty Quinn’s Barbeque
+- Milo’s Hamburgers
+- Mission BBQ
+- Mochinut
+- MOD Pizza
+- Moe’s Original BBQ
+- Moe’s Southwest Grill
+- Mooyah
+- Mountain Mike’s Pizza
+- Mr. Pickle’s Sandwich Shop
+- Mrs. Fields
+- Naf Naf Grill
+- Nathan’s Famous
+- Nation’s Giant Hamburgers
+- Newk’s Eatery
+- Nick the Greek
+- Noodles & Company
+- Nothing Bundt Cakes
+- Oberweis
+- Olive Garden
+- Orange Julius
+- Orange Leaf
+- Original Tommy’s
+- Outback Steakhouse
+- Pal’s Sudden Service
+- Pancheros Mexican Grill
+- Panda Express
+- Panera Bread
+- Papa Gino’s
+- Papa Johns
+- Papa Murphy’s
+- Paris Baguette
+- PDQ
+- Peet’s Coffee
+- Pei Wei Asian Kitchen
+- Penn Station East Coast Subs
+- Peter Piper Pizza
+- Philz Coffee
+- Phở Hòa
+- Pick Up Stix
+- Pie Five Pizza
+- Pieology
+- Pinkberry
+- Pita Pit
+- Pizza Factory
+- Pizza Guys
+- Pizza Hut
+- Pizza Inn
+- Pizza Ranch
+- PJ’s Coffee
+- Planet Smoothie
+- Playa Bowls
+- Poke Bros.
+- Pokeworks
+- Poké Bar
+- Pollo Campero
+- Pollo Tropical
+- Popbar
+- Popeyes
+- Port of Subs
+- Portillo’s
+- Potbelly
+- Pret A Manger
+- Pretzelmaker
+- PrimoHoagies
+- Protein Bar & Kitchen
+- Qdoba
+- Quickly
+- QuikTrip
+- Quiznos
+- Raising Cane’s
+- Rally’s
+- Red Lobster
+- Red Mango
+- Rita’s Italian Ice
+- Robeks
+- Roberto’s Taco Shop
+- Rosati’s Pizza
+- Roti Mediterranean
+- Round Table Pizza
+- Royal Farms
+- Rubio’s Coastal Grill
+- Rudy’s Country Store and Bar-B-Q
+- Runza
+- Rush Bowls
+- Salad and Go
+- Saladworks
+- Salsarita’s Fresh Mexican Grill
+- Sarku Japan
+- Sbarro
+- Schlotzsky’s
+- Scooter’s Coffee
+- Seoul Taco
+- Shake Shack
+- Shakey’s Pizza
+- Shane’s Rib Shack
+- Sharetea
+- Sheetz
+- Shipley Do-Nuts
+- Skippers Seafood & Chowder House
+- Skyline Chili
+- Slim Chickens
+- Smashburger
+- Smokey Bones
+- Smoothie King
+- Sneaky Pete’s
+- Sonic Drive-In
+- Sonny’s BBQ
+- Soulman’s Bar-B-Que
+- Spangles
+- Spitz
+- Spring Creek Barbeque
+- Starbucks
+- Steak ’n Shake
+- Subway
+- Sweet Frog
+- Sweetgreen
+- Swensons
+- Swig
+- Taco Bell
+- Taco Bueno
+- Taco Cabana
+- Taco del Mar
+- Taco John’s
+- Taco Mayo
+- Taco Tico
+- TacoTime
+- Tastee-Freez
+- Taziki’s Mediterranean Café
+- TCBY
+- Ted’s Hot Dogs
+- Teriyaki Madness
+- Texas Roadhouse
+- Tiff’s Treats
+- Tijuana Flats
+- Tim Hortons
+- Togo’s
+- Top Pot Doughnuts
+- Toppers Pizza
+- Torchy’s Tacos
+- Tous les Jours
+- Tropical Smoothie Cafe
+- Tropical Sno
+- Tudor’s Biscuit World
+- Tutti Frutti
+- Twin Peaks
+- Valentino’s
+- The Veggie Grill
+- Velvet Taco
+- Vitality Bowls
+- Vocelli Pizza
+- Voodoo Doughnut
+- WaBa Grill
+- Waffle House
+- Wahlburgers
+- Wahoo’s Fish Taco
+- Wawa
+- Wayback Burgers
+- Wendy’s
+- Wetzel’s Pretzels
+- Whataburger
+- Which Wich
+- White Castle
+- Wienerschnitzel
+- Winchell’s Donut House
+- Wingstop
+- Yogen Früz
+- Yogurtland
+- Yoshinoya
+- Your Pie
+- Yum-Yum Donuts
+- Zankou Chicken
+- Zaxby’s
+- Ziggi’s Coffee
+- Zippy’s
+- Zip’s Drive-In
+
+## Data layers
+
+- **Offline:** 1,348 menu records across 18 chains, including verified and clearly labeled archive records.
+- **Brand recognition:** all 422 names above plus normalized punctuation and selected common aliases.
+- **Live Food Cloud:** optional Nutritionix, FatSecret, and USDA provider search with credentials stored only on the server.
+- **Community packaged-food fallback:** Open Food Facts.

@@ -1,5 +1,8 @@
+npm dependency audit
 Critical: 0
 High: 0
 Moderate: 0
 Low: 0
+Info: 0
 Total: 0
+PASSED: no known vulnerabilities

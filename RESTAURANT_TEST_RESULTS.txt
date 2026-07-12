@@ -9,7 +9,8 @@ PASS search: taco johns crispy taco beef
 PASS search: white castle original slider
 PASS search: subawy turkey 6 inch
 PASS search: panera broccoli cheddar cup
-PASS source-quality badges and directory
+PASS brand recognition, hidden directory, and source-quality badge
+PASS provider-only brand recognition and canonical query routing
 PASS serving math and diary log
 PASS Food Cloud URL controls
-PASSED 14/14 restaurant database tests
+PASSED 15/15 restaurant database tests

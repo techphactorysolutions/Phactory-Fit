@@ -1,1 +1,1 @@
-All JavaScript syntax checks passed.
+PASSED JavaScript syntax checks for 6 production files

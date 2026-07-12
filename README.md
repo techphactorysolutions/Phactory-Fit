@@ -1,38 +1,49 @@
-# Phactory Food Cloud
+# Phactory Food Cloud — v1.13.0
 
-This optional edge/server gateway gives the public GitHub Pages app a secure server-side search layer without exposing provider credentials.
-
-## Why it exists
-
-A static PWA cannot safely embed FatSecret, USDA, Nutritionix, or other private API credentials. Every visitor could extract keys from JavaScript. The Worker stores credentials as server secrets, applies output limits, disables response caching, validates requests, and returns a normalized nutrition schema.
+This optional Cloudflare Worker gives the public GitHub Pages app broad live restaurant and branded-food search without exposing provider credentials in the repository or browser.
 
 ## Supported providers
 
-- FatSecret Platform API, when `FATSECRET_CLIENT_ID` and `FATSECRET_CLIENT_SECRET` are configured.
-- USDA FoodData Central, when `USDA_API_KEY` is configured.
+1. **Nutritionix** — primary restaurant/branded-menu provider when `NUTRITIONIX_APP_ID` and `NUTRITIONIX_API_KEY` are configured.
+2. **FatSecret Platform API** — restaurant, branded, and common-food search when `FATSECRET_CLIENT_ID` and `FATSECRET_CLIENT_SECRET` are configured.
+3. **USDA FoodData Central** — public-domain branded-food fallback when `USDA_API_KEY` is configured.
 
-The providers are optional. Review their current terms, attribution, rate limits, and data-storage rules before public deployment. The Worker does not persist provider results.
+The Worker merges and deduplicates results. It does not persist searches, diary data, profile data, or provider responses.
+
+## Why a server is required
+
+API keys embedded in a public PWA can be copied by every visitor. The Worker keeps credentials in server environment variables, restricts browser access to the exact `APP_ORIGIN`, bounds query/result sizes, rejects unsupported methods, disables response caching, and normalizes provider responses before the app receives them.
 
 ## Deploy
 
 1. Install Wrangler: `npm install -g wrangler`
-2. Copy `wrangler.toml.example` to `wrangler.toml` and set `APP_ORIGIN` to the exact deployed app origin.
-3. Authenticate: `wrangler login`
-4. Add secrets:
+2. Copy `wrangler.toml.example` to `wrangler.toml`.
+3. Set `APP_ORIGIN` to the exact production origin, such as `https://username.github.io` or the custom domain origin.
+4. Authenticate: `wrangler login`
+5. Add one or more provider credentials as secrets:
+   - `wrangler secret put NUTRITIONIX_APP_ID`
+   - `wrangler secret put NUTRITIONIX_API_KEY`
    - `wrangler secret put FATSECRET_CLIENT_ID`
    - `wrangler secret put FATSECRET_CLIENT_SECRET`
    - `wrangler secret put USDA_API_KEY`
-5. Deploy from this folder: `wrangler deploy`
-6. Put the resulting HTTPS `workers.dev` URL in root `config.js` as `foodCloudUrl`.
-7. Never commit `wrangler.toml` if it contains environment-specific information. Never commit credentials.
+6. Deploy: `wrangler deploy`
+7. Copy the HTTPS `workers.dev` URL into root `config.js` as `foodCloudUrl`.
+8. Open PhactoryFit Settings and confirm **Live Food Cloud connected** and the enabled providers.
+
+Never commit a credential or a populated environment-secret file.
 
 ## Endpoints
 
 - `GET /health`
-- `GET /v1/search?q=burger%20king%20whopper&region=US&limit=50`
+- `GET /v1/search?q=Wingstop%20lemon%20pepper&region=US&limit=50`
 
-## Production notes
+## Public-use safeguards
 
-Use a dedicated Worker, restrict `APP_ORIGIN`, enable Cloudflare rate limiting, and monitor provider quotas. A commercial public launch should use a provider contract that permits the intended display, caching, and retention behavior.
+- Set `APP_ORIGIN` exactly; do not use `*`.
+- Configure a Cloudflare Rate Limiting binding named `RATE_LIMITER`, or an equivalent edge rule, before a large public launch.
+- Monitor quotas and billing for every provider.
+- Review each provider's display, attribution, retention, and caching terms.
+- Keep responses `no-store` unless your provider agreement explicitly permits caching.
+- Consider a custom app domain so browser storage is isolated from unrelated GitHub Pages projects.
 
-FatSecret may require registered proxy IPs. If your account cannot authorize Cloudflare Worker egress, deploy the same gateway on a server with a fixed outbound IP.
+Nutritionix item details are fetched only for a bounded number of top autocomplete results. Provider failures are isolated so other configured sources can still return data.
