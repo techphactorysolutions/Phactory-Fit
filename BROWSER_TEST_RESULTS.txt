@@ -1,14 +1,11 @@
-PhactoryFit 1.11.0 browser regression summary
+PhactoryFit 1.12.0 release validation summary
 
-PASS: 5/5 UI and diary-editing tests
-- Cosmic dashboard and all four macro gauges
-- Navigation and hero logging action
-- Scroll reveal and reduced-motion behavior
-- iPad responsive layout
-- Edit meal period, exact time, serving amount, recalculated totals, persistence, automatic time logging, and deletion
-
-PASS: 5/5 malicious-input browser security tests
-PASS: 11/11 restaurant catalog, fuzzy-search, serving, and fallback tests
-PASS: 3/3 iPhone camera lifecycle tests
-
-TOTAL: 24/24 browser workflow scenarios passed
+Static/security/deployment checks: 89/89 passed
+Service-worker cache-security checks: 6/6 passed
+Malicious-input browser-security tests: 5/5 passed
+Restaurant search/provider tests: 14/14 passed
+Restaurant data audit: 1,348/1,348 records validated; 18 chains; 1,348 unique IDs
+Cosmic UI and editable diary tests: 5/5 passed
+iPhone camera lifecycle tests: 3/3 passed
+JavaScript syntax: passed
+npm dependency audit: 0 known vulnerabilities

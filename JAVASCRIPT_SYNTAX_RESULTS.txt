@@ -1,3 +1,1 @@
-PASS app.js
-PASS restaurant-foods.js
-PASS service-worker.js
+All JavaScript syntax checks passed.

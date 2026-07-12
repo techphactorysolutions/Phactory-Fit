@@ -1,8 +1,8 @@
-# PhactoryFit 1.11.0 Threat Model
+# PhactoryFit 1.12.0 Threat Model
 
 ## System summary
 
-PhactoryFit is a static PWA deployed from GitHub Pages. First-party HTML, CSS, JavaScript, icons, the manifest, and a vendored ZXing barcode decoder are served from the app origin. User records are stored in `localStorage`. The only intended runtime data service is Open Food Facts.
+PhactoryFit is a static PWA deployed from GitHub Pages. First-party HTML, CSS, JavaScript, icons, the manifest, and a vendored ZXing barcode decoder are served from the app origin. User records are stored in `localStorage`. Runtime food data may come from Open Food Facts and, when configured, an operator-controlled Phactory Food Cloud gateway. The gateway is separate from the PWA and holds provider secrets server-side.
 
 ## Protected assets
 
@@ -17,7 +17,8 @@ PhactoryFit is a static PWA deployed from GitHub Pages. First-party HTML, CSS, J
 
 - **Device/browser boundary:** local records and camera access are controlled by the browser profile and operating system.
 - **Application-origin boundary:** scripts and local storage are trusted only within the PhactoryFit origin.
-- **External-data boundary:** Open Food Facts content is untrusted input and must be normalized, escaped, size-limited, and host-restricted.
+- **External-data boundary:** Open Food Facts and Food Cloud content are untrusted input and must be normalized, escaped, size-limited, and destination-restricted.
+- **Food Cloud boundary:** the optional gateway may hold USDA/FatSecret credentials but must not receive or persist the diary or profile.
 - **Supply-chain boundary:** the vendored barcode library and GitHub Actions are third-party code and must be version-pinned and monitored.
 - **Deployment boundary:** repository write access and domain configuration can replace the entire client application.
 
@@ -47,9 +48,9 @@ PhactoryFit is a static PWA deployed from GitHub Pages. First-party HTML, CSS, J
 - unauthorized GitHub collaborator or compromised maintainer account;
 - person with local access to the unlocked device/browser profile.
 
-## Out of scope for 1.11.0
+## Out of scope for 1.12.0
 
-There is no backend, account, password, session, SQL database, file-upload server, payment system, multi-tenant authorization layer, or cloud health-data store. Server-side authorization, CSRF, SQL injection, SSRF, password reset, OAuth, rate limiting, and tenant isolation must be added to the threat model if those components are introduced.
+The core app has no account, password, session, SQL database, file-upload server, payment system, multi-tenant authorization layer, or cloud health-data store. The optional Food Cloud is a stateless search gateway and is in scope only for provider-secret handling, destination control, CORS, limits, and availability. Server-side authorization, CSRF, SQL injection, SSRF, password reset, OAuth, rate limiting, and tenant isolation must be added to the threat model if those components are introduced.
 
 ## Release gates
 
@@ -63,6 +64,11 @@ A public release should not ship unless:
 - camera close behavior is verified on a physical iPhone;
 - backup export/import is verified with non-production test data.
 
-## 1.11.0 restaurant-data extension
+## 1.12.0 restaurant-data extension
 
 The restaurant catalog adds integrity and staleness risk, not a new privileged backend. Mitigations include a frozen same-origin data file, field-length normalization, escaped rendering, explicit nutrient-availability metadata, verification dates, location/customization caveats, and automated regression tests. Incorrect or stale restaurant nutrition remains a residual data-quality risk and must be reviewed periodically against official U.S. sources.
+
+
+## 1.12.0 Food Cloud threats
+
+The gateway could expose provider credentials, become an open proxy, exhaust paid quotas, or return malicious provider text. Controls include server-only secrets, fixed upstream URLs, exact-origin CORS, GET-only public search, bounded input/output, no-store responses, normalized client rendering, and recommended edge rate limiting. Provider licensing and egress-IP requirements remain operational risks.

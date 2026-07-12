@@ -1,6 +1,6 @@
 # PhactoryFit Privacy Notice
 
-**Version:** 1.11.0  
+**Version:** 1.12.0  
 **Operator:** Tech Phactory Solutions LLC
 
 ## Data stored on the device
@@ -17,7 +17,7 @@ The application has no PhactoryFit account server and does not automatically syn
 
 ## Information sent over the network
 
-When a user searches for a packaged food or looks up an unknown barcode, the search text or barcode number is sent to Open Food Facts. The request also includes the PhactoryFit application name and version. Nutrition records and permitted product images are returned from Open Food Facts.
+When a user searches for a packaged food or looks up an unknown barcode, the search text or barcode number is sent to Open Food Facts. If the optional Phactory Food Cloud is configured, typed food-search text is also sent to that operator-controlled endpoint, which may query FatSecret or USDA FoodData Central. The reference Food Cloud does not receive the user diary, name, weight, activity history, camera frames, or barcode photographs, and its responses are marked `no-store`.
 
 PhactoryFit does not include advertising SDKs, behavioral analytics, tracking pixels, or social-media SDKs.
 
@@ -49,12 +49,12 @@ Exported backup files contain the user's fitness and nutrition data in readable 
 
 ## Data minimization
 
-PhactoryFit 1.11.0 does not collect email addresses, passwords, payment details, precise location, contacts, body photographs, government identifiers, or medical records. Features that add cloud storage, wearable health data, photos, or accounts require an updated privacy notice and security review before release.
+PhactoryFit 1.12.0 does not collect email addresses, passwords, payment details, precise location, contacts, body photographs, government identifiers, or medical records. Features that add cloud storage, wearable health data, photos, or accounts require an updated privacy notice and security review before release.
 
 ## Health information
 
 PhactoryFit provides general fitness and nutrition tracking. It is not a medical device and does not provide diagnosis, treatment, or emergency guidance. Users should verify community-supplied nutrition data against product packaging when accuracy matters.
 
-## Restaurant location setting in 1.11.0
+## Restaurant location setting in 1.12.0
 
-The optional two-letter state setting is stored locally with the rest of the profile. It is used only to label U.S. restaurant results. PhactoryFit does not request GPS access, transmit the state setting to a restaurant service, or determine a user's precise location. The bundled restaurant catalog is read locally from the app files.
+The optional two-letter state setting is stored locally with the rest of the profile. It is used only to label U.S. restaurant results. PhactoryFit does not request GPS access, transmit the state setting to a restaurant service, or determine a user's precise location. The bundled restaurant catalog is read locally from the app files. The state code is not included in Food Cloud requests in version 1.12.0.

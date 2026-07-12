@@ -1,68 +1,38 @@
-# PhactoryFit 1.11.0
+# Phactory Food Cloud
 
-**Build better. Fuel smarter. Live stronger.**
+This optional edge/server gateway gives the public GitHub Pages app a secure server-side search layer without exposing provider credentials.
 
-PhactoryFit is an installable, local-first fitness and nutrition Progressive Web App designed by Tech Phactory Solutions. It combines calorie and macro tracking, restaurant and packaged-food search, barcode scanning, editable timed diary entries, workouts, habits, weight trends, backups, and transparent coaching without requiring an account.
+## Why it exists
 
-## New in 1.11.0 — Expanded restaurant discovery
+A static PWA cannot safely embed FatSecret, USDA, Nutritionix, or other private API credentials. Every visitor could extract keys from JavaScript. The Worker stores credentials as server secrets, applies output limits, disables response caching, validates requests, and returns a normalized nutrition schema.
 
-- Expanded the offline U.S. restaurant catalog from 43 to **250 menu records and components** across **11 chains**.
-- Supported chains: McDonald's, Chick-fil-A, Starbucks, Taco Bell, Subway, Arby's, Sonic Drive-In, Five Guys, Buffalo Wild Wings, Chipotle, and Panera Bread.
-- Added size-aware Subway entries, Chipotle ingredients and a high-protein bowl, and Panera breakfast, sandwiches, soups, salads, and mac & cheese.
-- Added a restaurant browser showing each supported chain and local item count.
-- Added weighted fuzzy matching for spelling mistakes, punctuation, aliases, plural forms, chain shorthand, and common menu phrasing.
-- Searches such as `subawy turkey 6 inch`, `arbys roastbeef`, `fiveguys little cheese burger`, `bdubs mozzarella`, `chipotle high protein bowl`, and `panera broccoli cheddar cup` resolve to useful results.
-- Restaurant-like searches also query the optional Open Food Facts community database so unsupported chains can still produce supplemental matches when online.
-- Broad chain searches rank choices using today's remaining calories and protein; exact menu searches prioritize textual relevance.
+## Supported providers
 
-Restaurant data represents standard U.S. menu nutrition, not live store inventory. Availability, recipes, portions, limited-time products, and customizations can vary by restaurant.
+- FatSecret Platform API, when `FATSECRET_CLIENT_ID` and `FATSECRET_CLIENT_SECRET` are configured.
+- USDA FoodData Central, when `USDA_API_KEY` is configured.
 
-## Existing core features
+The providers are optional. Review their current terms, attribution, rate limits, and data-storage rules before public deployment. The Worker does not persist provider results.
 
-- Daily calories, protein, carbohydrates, fat, fiber, sugar, and sodium
-- Meal diary with exact time, editable serving quantity, meal reassignment, and deletion
-- Custom foods and locally remembered products
-- Online packaged-food search through Open Food Facts
-- Smarter eating-out suggestions based on remaining calories and protein
-- Rear-camera UPC/EAN scanning and barcode-photo fallback
-- Workouts, water, steps, sleep, weigh-ins, and weight trends
-- Adaptive calorie guidance and consistency scoring
-- JSON backup and restore
-- Animated cosmic UI with reduced-motion support
-- Installable offline PWA
-- No account, analytics SDK, advertising SDK, or private API key
+## Deploy
 
-## GitHub Pages deployment
+1. Install Wrangler: `npm install -g wrangler`
+2. Copy `wrangler.toml.example` to `wrangler.toml` and set `APP_ORIGIN` to the exact deployed app origin.
+3. Authenticate: `wrangler login`
+4. Add secrets:
+   - `wrangler secret put FATSECRET_CLIENT_ID`
+   - `wrangler secret put FATSECRET_CLIENT_SECRET`
+   - `wrangler secret put USDA_API_KEY`
+5. Deploy from this folder: `wrangler deploy`
+6. Put the resulting HTTPS `workers.dev` URL in root `config.js` as `foodCloudUrl`.
+7. Never commit `wrangler.toml` if it contains environment-specific information. Never commit credentials.
 
-1. Export a backup from the current app before replacing production files.
-2. Upload every file and folder from this package to the repository root, including `.github`, `tests`, and `.nojekyll`.
-3. Allow GitHub Pages to finish deploying.
-4. Keep **Enforce HTTPS** enabled.
-5. Open the Pages URL directly in Safari and refresh twice.
-6. Fully close and reopen the Home Screen app.
-7. Confirm **Settings → Version 1.11.0**.
+## Endpoints
 
-The service worker uses a new `phactoryfit-v1.11.0` cache so older application assets are replaced during activation.
+- `GET /health`
+- `GET /v1/search?q=burger%20king%20whopper&region=US&limit=50`
 
-## Repeatable tests
+## Production notes
 
-```bash
-npm run test:static
-npm run test:service-worker
-npm run test:browser-security
-npm run test:restaurant
-npm run test:ui
-npm run test:camera
-npm audit --omit=dev --audit-level=high
-node --check app.js
-node --check restaurant-foods.js
-node --check service-worker.js
-```
+Use a dedicated Worker, restrict `APP_ORIGIN`, enable Cloudflare rate limiting, and monitor provider quotas. A commercial public launch should use a provider contract that permits the intended display, caching, and retention behavior.
 
-Playwright and Chromium are required only for the repository test suite. The deployed application has no Node.js runtime requirement.
-
-## Data accuracy and privacy
-
-The local catalog uses documented standard U.S. menu values and records a verification date. Missing nutrients remain unavailable rather than being converted to false zeroes. Open Food Facts records are community-contributed. Verify critical nutrition, allergen, and ingredient information against the current restaurant listing or package label.
-
-Diary data stays in the browser unless exported. Camera frames and barcode photos are processed locally. See `PRIVACY.md`, `SECURITY.md`, `THREAT_MODEL.md`, `RESTAURANT_DATA_SOURCES.md`, and `AUDIT_REPORT.md` for release boundaries.
+FatSecret may require registered proxy IPs. If your account cannot authorize Cloudflare Worker egress, deploy the same gateway on a server with a fixed outbound IP.

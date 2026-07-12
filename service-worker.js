@@ -1,16 +1,17 @@
 'use strict';
 
-const CACHE = 'phactoryfit-v1.11.0';
+const CACHE = 'phactoryfit-v1.12.0';
 const SCOPE_URL = new URL(self.registration.scope);
 const OFFLINE_PAGE = new URL('./index.html', SCOPE_URL).href;
 const CORE_SHELL = [
   './',
   './index.html',
-  './styles.css?v=1.11.0',
-  './config.js?v=1.11.0',
-  './restaurant-foods.js?v=1.11.0',
-  './zxing-browser.min.js?v=1.11.0',
-  './app.js?v=1.11.0',
+  './styles.css?v=1.12.0',
+  './config.js?v=1.12.0',
+  './restaurant-foods.js?v=1.12.0',
+  './restaurant-foods-expanded.js?v=1.12.0',
+  './zxing-browser.min.js?v=1.12.0',
+  './app.js?v=1.12.0',
   './manifest.webmanifest'
 ];
 const OPTIONAL_SHELL = [
@@ -28,6 +29,7 @@ const CACHEABLE_PATHS = new Set([
   new URL('./styles.css', SCOPE_URL).pathname,
   new URL('./config.js', SCOPE_URL).pathname,
   new URL('./restaurant-foods.js', SCOPE_URL).pathname,
+  new URL('./restaurant-foods-expanded.js', SCOPE_URL).pathname,
   new URL('./zxing-browser.min.js', SCOPE_URL).pathname,
   new URL('./app.js', SCOPE_URL).pathname,
   new URL('./manifest.webmanifest', SCOPE_URL).pathname,
@@ -61,7 +63,7 @@ function canCache(request, response) {
 
 function canonicalCacheKey(request) {
   const url = new URL(request.url);
-  if (/\.(?:js|css)$/.test(url.pathname)) url.search = '?v=1.11.0';
+  if (/\.(?:js|css)$/.test(url.pathname)) url.search = '?v=1.12.0';
   else url.search = '';
   url.hash = '';
   return url.href;

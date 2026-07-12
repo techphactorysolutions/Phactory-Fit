@@ -3,4 +3,4 @@ PASS: unique IDs: 70 IDs checked
 PASS: no nested static forms
 PASS: all four macro gauges present
 PASS: branding and slogan present
-PASS: version 1.11.0 assets present
+PASS: version 1.12.0 assets present

@@ -43,6 +43,7 @@ def build_inline_html() -> str:
     css = (ROOT / "styles.css").read_text()
     config = (ROOT / "config.js").read_text()
     restaurant_foods = (ROOT / "restaurant-foods.js").read_text()
+    expanded_restaurant_foods = (ROOT / "restaurant-foods-expanded.js").read_text()
     zxing = (ROOT / "zxing-browser.min.js").read_text()
     app = (ROOT / "app.js").read_text()
     storage_shim = r"""
@@ -64,11 +65,12 @@ def build_inline_html() -> str:
     """
     html = re.sub(r'\s*<meta http-equiv="Content-Security-Policy"[^>]+>', '', html, count=1)
     html = html.replace('</head>', storage_shim + '</head>')
-    html = html.replace('<link rel="stylesheet" href="styles.css?v=1.11.0">', '<style>' + css + '</style>')
-    html = html.replace('<script src="config.js?v=1.11.0" defer></script>', '<script>' + config + '</script>')
-    html = html.replace('<script src="restaurant-foods.js?v=1.11.0" defer></script>', '<script>' + restaurant_foods + '</script>')
-    html = html.replace('<script src="zxing-browser.min.js?v=1.11.0" defer></script>', '<script>' + zxing + '</script>')
-    html = html.replace('<script src="app.js?v=1.11.0" defer></script>', '<script>' + app + '</script>')
+    html = html.replace('<link rel="stylesheet" href="styles.css?v=1.12.0">', '<style>' + css + '</style>')
+    html = html.replace('<script src="config.js?v=1.12.0" defer></script>', '<script>' + config + '</script>')
+    html = html.replace('<script src="restaurant-foods.js?v=1.12.0" defer></script>', '<script>' + restaurant_foods + '</script>')
+    html = html.replace('<script src="restaurant-foods-expanded.js?v=1.12.0" defer></script>', '<script>' + expanded_restaurant_foods + '</script>')
+    html = html.replace('<script src="zxing-browser.min.js?v=1.12.0" defer></script>', '<script>' + zxing + '</script>')
+    html = html.replace('<script src="app.js?v=1.12.0" defer></script>', '<script>' + app + '</script>')
     return html
 
 

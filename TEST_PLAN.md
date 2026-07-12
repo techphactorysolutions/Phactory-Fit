@@ -1,4 +1,4 @@
-# PhactoryFit 1.11.0 Release Validation Plan
+# PhactoryFit 1.12.0 Release Validation Plan
 
 ## Automated
 
@@ -48,7 +48,7 @@ Expected results:
 
 1. Deploy all package files to GitHub Pages.
 2. Open the site in Safari and refresh twice.
-3. Confirm Settings displays Version 1.11.0.
+3. Confirm Settings displays Version 1.12.0.
 4. Test restaurant search online and offline.
 5. Test rear-camera barcode scanning after allowing permission.
 6. Close and reopen the Home Screen app and verify the restaurant catalog still works offline.

@@ -1,12 +1,15 @@
-PASS test_mcdonalds_breakfast_search_and_log
-PASS test_restaurant_directory_and_chain_coverage
-PASS test_subway_fuzzy_size_and_footlong
-PASS test_arbys_alias_and_roast_beef
-PASS test_sonic_breakfast_search
-PASS test_five_guys_spacing_and_item_alias
-PASS test_buffalo_wild_wings_alias
-PASS test_chipotle_component_and_high_protein_search
-PASS test_panera_alias_soup_and_sandwich_search
-PASS test_partial_nutrition_never_looks_like_verified_zero
-PASS test_location_label_typo_and_online_supplement
-PASSED 11/11 restaurant search tests
+PASS catalog breadth and provenance
+PASS search: mcdonlds breakfast tonight
+PASS search: bk whopper
+PASS search: wendys baconator
+PASS search: dq peanut buster parfait
+PASS search: hardees sausage biscuit
+PASS search: little caesars pepperoni
+PASS search: taco johns crispy taco beef
+PASS search: white castle original slider
+PASS search: subawy turkey 6 inch
+PASS search: panera broccoli cheddar cup
+PASS source-quality badges and directory
+PASS serving math and diary log
+PASS Food Cloud URL controls
+PASSED 14/14 restaurant database tests

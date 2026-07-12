@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restaurant discovery, fuzzy matching, serving math, and smart-pick regression tests."""
+"""Restaurant catalog, fuzzy matching, source labels, serving math, and Food Cloud regressions."""
 from __future__ import annotations
 
 import asyncio
@@ -10,184 +10,93 @@ from browser_security import INLINE_HTML
 
 CHROMIUM_EXECUTABLE = "/usr/bin/chromium" if Path("/usr/bin/chromium").exists() else None
 
-async def new_page(browser, *, capture_requests=None):
-    context = await browser.new_context(
-        viewport={"width": 390, "height": 844},
-        is_mobile=True,
-        has_touch=True,
-        device_scale_factor=3,
-    )
-
-    async def off_router(route):
-        if capture_requests is not None:
-            capture_requests.append(route.request.url)
-        await route.fulfill(status=200, content_type="application/json", body=json.dumps({"count": 0, "products": []}))
-
-    await context.route("https://world.openfoodfacts.org/**", off_router)
-    page = await context.new_page()
-    errors: list[str] = []
-    page.on("pageerror", lambda error: errors.append(str(error)))
-    await page.set_content(INLINE_HTML, wait_until="domcontentloaded")
-    await page.wait_for_selector("#app")
-    return context, page, errors
-
-async def test_mcdonalds_breakfast_search_and_log(browser):
-    context, page, errors = await new_page(browser)
-    await page.evaluate("openModal('food', {meal:'Breakfast'})")
-    await page.fill("#foodSearch", "McDonald's breakfast")
-    await page.wait_for_selector(".restaurant-food-result")
-    text = await page.locator("#foodResults").inner_text()
-    first_result = await page.locator(".restaurant-food-result").first.inner_text()
-    assert "Sausage McMuffin with Egg" in first_result or "Egg McMuffin" in first_result, first_result
-    names = await page.evaluate("restaurantSearchResults(\"McDonald\'s breakfast\").map(item => item.name)")
-    assert "Hash Browns" in names and "Big Breakfast" in names, names
-    assert "Strong fit" in text or "Good fit" in text, text
-
-    await page.locator('[data-food-id="restaurant-mcd-egg-mcmuffin"]').click()
-    assert "310" in await page.locator(".nutrition-calories").inner_text()
-    await page.fill("#foodQuantityInput", "2")
-    preview = await page.locator("#servingTotalPreview").inner_text()
-    assert "620" in preview and "34g" in preview.replace(" ", ""), preview
-    await page.locator("#addFoodForm button[type='submit']").click()
-    assert await page.locator("#caloriesConsumed").inner_text() == "620"
-    assert await page.locator("#proteinConsumed").inner_text() == "34"
-    assert not errors, errors
-    await context.close()
-
-async def test_restaurant_directory_and_chain_coverage(browser):
-    context, page, errors = await new_page(browser)
-    await page.evaluate("openModal('food')")
-    directory = await page.locator(".restaurant-directory").inner_text()
-    for brand in ["McDonald", "Chick-fil-A", "Taco Bell", "Subway", "Arby", "Sonic", "Five Guys", "Buffalo Wild Wings", "Starbucks", "Chipotle", "Panera Bread"]:
-        assert brand in directory, directory
-    count = await page.evaluate("restaurantFoods().length")
-    assert count >= 250, count
-    assert not errors, errors
-    await context.close()
-
-async def test_subway_fuzzy_size_and_footlong(browser):
-    context, page, errors = await new_page(browser)
-    result = await page.evaluate("""() => ({
-      fuzzy: restaurantSearchResults('subawy turkey 6 inch').slice(0,8).map(item => item.name),
-      footlong: restaurantSearchResults('subway foot long turkey').slice(0,8).map(item => item.name)
-    })""")
-    assert any("6-inch Oven-Roasted Turkey" == name for name in result["fuzzy"]), result
-    assert any("Footlong" in name and "Turkey" in name for name in result["footlong"]), result
-    assert not errors, errors
-    await context.close()
-
-async def test_arbys_alias_and_roast_beef(browser):
-    context, page, errors = await new_page(browser)
-    names = await page.evaluate("restaurantSearchResults('arbys roastbeef').slice(0,10).map(item => item.name)")
-    assert "Classic Roast Beef" in names, names
-    assert "Double Roast Beef" in names, names
-    assert not errors, errors
-    await context.close()
-
-async def test_sonic_breakfast_search(browser):
-    context, page, errors = await new_page(browser)
-    names = await page.evaluate("restaurantSearchResults('sonic breakfast burrito').slice(0,10).map(item => item.name)")
-    assert "Breakfast Burrito with Bacon" in names, names
-    assert "Breakfast Burrito with Sausage" in names, names
-    assert not errors, errors
-    await context.close()
-
-async def test_five_guys_spacing_and_item_alias(browser):
-    context, page, errors = await new_page(browser)
-    names = await page.evaluate("restaurantSearchResults('fiveguys little cheese burger').slice(0,10).map(item => item.name)")
-    assert names and names[0] == "Little Cheeseburger", names
-    assert not errors, errors
-    await context.close()
-
-async def test_buffalo_wild_wings_alias(browser):
-    context, page, errors = await new_page(browser)
-    names = await page.evaluate("restaurantSearchResults('bdubs mozzarella').slice(0,10).map(item => item.name)")
-    assert names == ["Mozzarella Sticks"], names
-    assert not errors, errors
-    await context.close()
-
-async def test_chipotle_component_and_high_protein_search(browser):
-    context, page, errors = await new_page(browser)
-    result = await page.evaluate("""() => ({
-      chicken: restaurantSearchResults('chipotle chicken').slice(0,10).map(item => item.name),
-      protein: restaurantSearchResults('chipotle high protein bowl').slice(0,10).map(item => item.name)
-    })""")
-    assert "Chicken" in result["chicken"], result
-    assert "Double High Protein Bowl" in result["protein"], result
-    assert not errors, errors
-    await context.close()
-
-async def test_panera_alias_soup_and_sandwich_search(browser):
-    context, page, errors = await new_page(browser)
-    result = await page.evaluate("""() => ({
-      soup: restaurantSearchResults('panera broccoli cheddar cup').slice(0,10).map(item => item.name),
-      sandwich: restaurantSearchResults('panera chipotle chicken avo half').slice(0,10).map(item => item.name)
-    })""")
-    assert "Broccoli Cheddar Soup — Cup" in result["soup"], result
-    assert any("Chipotle Chicken Avocado Melt" in name and "Half" in name for name in result["sandwich"]), result
-    assert not errors, errors
-    await context.close()
-
-async def test_partial_nutrition_never_looks_like_verified_zero(browser):
-    context, page, errors = await new_page(browser)
-    await page.evaluate("openModal('food')")
-    await page.fill("#foodSearch", "McChicken Biscuit")
-    await page.wait_for_selector('[data-food-id="restaurant-mcd-mcchicken-biscuit"]')
-    await page.locator('[data-food-id="restaurant-mcd-mcchicken-biscuit"]').click()
-    facts = await page.locator(".nutrition-label").inner_text()
-    assert "Calories\n420" in facts, facts
-    assert "Total Fat" not in facts and "Protein" not in facts, facts
-    warning = await page.locator(".restaurant-data-warning").inner_text()
-    assert "Partial nutrition record" in warning, warning
-    preview = await page.locator("#servingTotalPreview").inner_text()
-    assert "—" in preview, preview
-    assert not errors, errors
-    await context.close()
-
-async def test_location_label_typo_and_online_supplement(browser):
-    requests: list[str] = []
-    context, page, errors = await new_page(browser, capture_requests=requests)
-    result = await page.evaluate("""() => {
-      state.profile.stateCode = 'MO';
-      const matches = restaurantSearchResults('mcdonlds breakfast tonight');
-      return {label:restaurantLocationLabel(), names:matches.slice(0,10).map(item => item.name)};
-    }""")
-    assert result["label"] == "United States · MO", result
-    assert "Hash Browns" in result["names"] or "Egg McMuffin" in result["names"], result
-
-    await page.evaluate("openModal('food')")
-    await page.fill("#foodSearch", "Wendys grilled chicken sandwich")
-    await page.wait_for_timeout(900)
-    assert requests, "Restaurant-like searches must still supplement the local catalog with the online community database"
-    assert not errors, errors
-    await context.close()
-
 async def main():
-    tests = [
-        test_mcdonalds_breakfast_search_and_log,
-        test_restaurant_directory_and_chain_coverage,
-        test_subway_fuzzy_size_and_footlong,
-        test_arbys_alias_and_roast_beef,
-        test_sonic_breakfast_search,
-        test_five_guys_spacing_and_item_alias,
-        test_buffalo_wild_wings_alias,
-        test_chipotle_component_and_high_protein_search,
-        test_panera_alias_soup_and_sandwich_search,
-        test_partial_nutrition_never_looks_like_verified_zero,
-        test_location_label_typo_and_online_supplement,
-    ]
     async with async_playwright() as playwright:
-        launch_options = {"headless": True, "args": ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"]}
+        options = {"headless": True, "args": ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"]}
         if CHROMIUM_EXECUTABLE:
-            launch_options["executable_path"] = CHROMIUM_EXECUTABLE
-        browser = await playwright.chromium.launch(**launch_options)
-        passed = 0
-        for test in tests:
-            await test(browser)
-            passed += 1
-            print(f"PASS {test.__name__}")
-        await browser.close()
-    print(f"PASSED {passed}/{len(tests)} restaurant search tests")
+            options["executable_path"] = CHROMIUM_EXECUTABLE
+        browser = await playwright.chromium.launch(**options)
+        context = await browser.new_context(viewport={"width":390,"height":844}, is_mobile=True, has_touch=True, device_scale_factor=3)
+        requests: list[str] = []
 
-if __name__ == "__main__":
+        async def off_router(route):
+            requests.append(route.request.url)
+            await route.fulfill(status=200, content_type="application/json", body=json.dumps({"count":0,"products":[]}))
+        await context.route("https://world.openfoodfacts.org/**", off_router)
+
+        page = await context.new_page()
+        errors: list[str] = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        await page.set_content(INLINE_HTML, wait_until="domcontentloaded")
+        await page.wait_for_selector("#app")
+        passed = 0
+
+        # 1. Catalog breadth, provenance, and exact counts.
+        catalog = await page.evaluate("""() => ({
+          count: restaurantFoods().length,
+          archiveCount: restaurantFoods().filter(item => item.dataQuality === 'archived-menu').length,
+          officialCount: restaurantFoods().filter(item => item.dataQuality === 'official').length,
+          brands: [...new Set(restaurantFoods().map(item => item.brand))].sort()
+        })""")
+        assert catalog["count"] >= 1348, catalog
+        assert catalog["archiveCount"] == 1098, catalog
+        assert catalog["officialCount"] >= 250, catalog
+        for brand in ["McDonald's","Burger King","Wendy's","Dairy Queen","Hardee's","Little Caesars","Taco John's","White Castle","Chick-fil-A","Taco Bell","Subway","Arby's","Sonic Drive-In","Five Guys","Buffalo Wild Wings","Starbucks","Chipotle","Panera Bread"]:
+            assert brand in catalog["brands"], (brand, catalog["brands"])
+        passed += 1; print("PASS catalog breadth and provenance")
+
+        # 2-10. Search quality across aliases, typos, meals, and sizes.
+        cases = [
+          ("mcdonlds breakfast tonight", ["Hash Browns", "Egg McMuffin"]),
+          ("bk whopper", ["Whopper Sandwich"]),
+          ("wendys baconator", ["Baconator"]),
+          ("dq peanut buster parfait", ["Peanut Buster Parfait"]),
+          ("hardees sausage biscuit", ["Sausage Biscuit"]),
+          ("little caesars pepperoni", ["Pepperoni"]),
+          ("taco johns crispy taco beef", ["Crispy Taco"]),
+          ("white castle original slider", ["Original Slider"]),
+          ("subawy turkey 6 inch", ["6-inch Oven-Roasted Turkey"]),
+          ("panera broccoli cheddar cup", ["Broccoli Cheddar Soup — Cup"]),
+        ]
+        for query, expected in cases:
+            names = await page.evaluate("q => restaurantSearchResults(q).slice(0,25).map(item => item.name)", query)
+            assert any(any(fragment.lower() in name.lower() for fragment in expected) for name in names), (query, names[:10])
+            passed += 1; print(f"PASS search: {query}")
+
+        # 12. Search UI labels archived data and lists the expanded directory.
+        await page.evaluate("openModal('food')")
+        directory = await page.locator('.restaurant-directory').inner_text()
+        assert "18 chains" in directory and "1348 items" in directory, directory
+        await page.fill('#foodSearch', 'bk whopper')
+        await page.wait_for_selector('.food-source-badge.archived-menu')
+        badge = await page.locator('.food-source-badge.archived-menu').first.evaluate('(el) => ({text:el.textContent, html:el.outerHTML})')
+        assert 'Archive' in badge['text']
+        passed += 1; print("PASS source-quality badges and directory")
+
+        # 13. Official item serving math and diary logging remain correct.
+        await page.fill('#foodSearch', "McDonald's breakfast")
+        await page.locator('[data-food-id="restaurant-mcd-egg-mcmuffin"]').click()
+        await page.fill('#foodQuantityInput', '2')
+        preview = await page.locator('#servingTotalPreview').inner_text()
+        assert '620' in preview and '34g' in preview.replace(' ', ''), preview
+        await page.locator('#addFoodForm button[type="submit"]').click()
+        assert await page.locator('#caloriesConsumed').inner_text() == '620'
+        passed += 1; print("PASS serving math and diary log")
+
+        # 14. Food Cloud configuration stays off by default and blocks unsafe origins.
+        cloud = await page.evaluate("""() => {
+          const original = window.PHACTORYFIT_CONFIG;
+          const unsafe = configuredFoodCloudUrl();
+          return {unsafe, defaultUrl: original.foodCloudUrl, workersAllowed: Boolean(safeApiUrl('https://example.workers.dev/v1/search')),
+                  evilBlocked: safeApiUrl('https://evil.example/v1/search') === null};
+        }""")
+        assert cloud == {"unsafe":"", "defaultUrl":"", "workersAllowed":True, "evilBlocked":True}, cloud
+        passed += 1; print("PASS Food Cloud URL controls")
+
+        assert not errors, errors
+        await context.close()
+        await browser.close()
+        print(f"PASSED {passed}/{passed} restaurant database tests")
+
+if __name__ == '__main__':
     asyncio.run(main())

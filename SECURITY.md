@@ -2,13 +2,13 @@
 
 ## Supported release
 
-Security fixes are applied to the latest published release only. The supported release in this package is **PhactoryFit 1.11.0**.
+Security fixes are applied to the latest published release only. The supported release in this package is **PhactoryFit 1.12.0**.
 
 ## Architecture and security boundary
 
-PhactoryFit 1.11.0 is a static, local-first Progressive Web App. It has no account system, server database, authentication cookie, payment flow, private API key, or privileged backend. Nutrition and activity data are stored in the browser under the app's web origin. Packaged-food searches and unknown barcode lookups use read-only Open Food Facts endpoints.
+PhactoryFit 1.12.0 remains a static, local-first Progressive Web App. It has no account system, server database, authentication cookie, payment flow, or client-side private API key. Nutrition and activity data are stored in the browser under the app's web origin. An optional, separately deployed Food Cloud search gateway can hold provider credentials server-side; it receives only bounded search queries and does not store the user diary.
 
-This means SQL injection, server-side request forgery, broken session management, password theft, and server database exposure are not current attack surfaces. They become relevant immediately if authentication, cloud sync, payments, uploads, or a backend are added and would require a new threat model and penetration test.
+The static app has no SQL, sessions, or user database. The optional Food Cloud introduces a small server-side network boundary and must retain strict provider allowlists, query limits, exact-origin CORS, no-store responses, secret management, rate limiting, and provider-license review. Authentication, cloud sync, payments, uploads, or user-data storage would require a substantially broader penetration test.
 
 ## Built-in controls
 
@@ -64,6 +64,11 @@ No security audit can prove that an application has zero vulnerabilities. The cu
 
 Run a new audit before adding accounts, cloud synchronization, health-record imports, body-photo upload, Apple Health/HealthKit, payments, AI tool execution, administrative panels, or any server-side component.
 
-## Restaurant catalog security in 1.11.0
+## Restaurant catalog security in 1.12.0
 
-`restaurant-foods.js` is a same-origin, read-only static asset included in the explicit service-worker allowlist. It does not execute third-party code, require credentials, or contact restaurant websites at runtime. All catalog text is normalized and escaped through the same rendering defenses used for imported and external product data. Updating the catalog requires normal repository review and the security workflow.
+`restaurant-foods.js` and `restaurant-foods-expanded.js` are same-origin, read-only static assets included in the explicit service-worker allowlist. It does not execute third-party code, require credentials, or contact restaurant websites at runtime. All catalog text is normalized and escaped through the same rendering defenses used for imported and external product data. Updating the catalog requires normal repository review and the security workflow.
+
+
+## Food Cloud security in 1.12.0
+
+The public app permits only same-origin HTTPS endpoints and dedicated `workers.dev` endpoints through both CSP and runtime validation. Provider credentials must be stored as server secrets. The reference gateway uses exact-origin CORS, bounded query/response sizes, `no-store`, provider destination constants, and no diary storage. Deployers must add production rate limiting and may need fixed outbound IP hosting for providers that require registered proxy IPs.
