@@ -1,88 +1,86 @@
-# PhactoryFit v1.3.0 Barcode Repair Report
+# PhactoryFit v1.4.0 Audit Report
 
-**Repair date:** July 11, 2026  
-**Target:** iPhone Safari and installed GitHub Pages PWA
+**Audit date:** July 11, 2026  
+**Scope:** Automatic barcode nutrition generation, barcode scanning, product normalization, diary insertion, local caching, PWA deployment, and regression checks.
 
-## Final status
+## Requested behavior
 
-**PASS — the barcode camera, image decoder, product lookup, serving normalization, and cleanup paths were repaired and passed automated testing.**
+After a valid UPC/EAN barcode is detected, the app must automatically retrieve the matching product record and generate nutrition facts without requiring the user to type the nutrients manually.
 
-## Defects found
+## Implemented behavior
 
-### 1. Live scanning was not optimized for a small UPC/EAN inside a large camera frame
+- A stable camera or photo barcode read automatically triggers product lookup.
+- Product nutrition is normalized to the listed serving size.
+- A Nutrition Facts-style card is rendered immediately.
+- The user can select the meal and serving count from the generated result.
+- One tap adds the product to the diary.
+- The product is cached locally for future scans.
+- A correction workflow is prefilled with the generated values.
+- User-corrected nutrition replaces the prior barcode record locally.
+- Missing products fall back to one-time entry and local memory.
+- UPC-A and equivalent EAN-13 codes with a leading zero are both attempted.
 
-The earlier ZXing path decoded the complete video frame. A grocery barcode occupying only a small part of a portrait camera image could be difficult to resolve, particularly under glare or soft autofocus.
+## Defects found and repaired
 
-### 2. A single decoded value was accepted immediately
+1. **Barcode results showed only a compact summary.**  
+   Replaced it with a generated Nutrition Facts card and direct diary controls.
 
-A partial or unstable read could be accepted without a second confirmation.
+2. **Community data could not be corrected efficiently.**  
+   Added a prefilled correction form and local replacement logic.
 
-### 3. Unknown products appeared to fail after a successful scan
+3. **Extended nutrition was discarded.**  
+   Added saturated fat, trans fat, and cholesterol to normalized food records.
 
-`offProxyUrl` was empty by default. As a result, a correctly decoded barcode that was not already stored locally skipped online product retrieval and immediately requested manual food creation. This could look like the reader itself had failed.
+4. **Generated decimal values failed browser validation.**  
+   The correction form used `step="0.1"`, which rejected values such as 199.43 and 3.922. Nutrition inputs now accept valid decimal precision.
 
-### 4. External nutrition could be calculated with the wrong serving basis
+5. **Equivalent UPC-A/EAN-13 representations could miss.**  
+   Added leading-zero candidate lookup and local matching.
 
-The earlier normalization could select a raw per-100-gram nutrient value before applying the product's serving factor. This could show an entire 100-gram amount as one labeled serving.
+## Automated browser tests
 
-### 5. Photo decoding had only a narrow fallback path
+**8/8 passed** in Chromium at a 390 × 844 mobile viewport:
 
-The earlier photo workflow did not systematically try center crops and contrast-enhanced variants.
-
-### 6. Closing during a pending permission request could leave a late stream active
-
-If camera permission resolved after the modal had already closed, the newly returned stream needed explicit shutdown before exiting the stale scan session.
-
-## Repairs completed
-
-- Added a high-resolution center-region scan canvas aligned to the visible guide.
-- Added periodic full-frame attempts for off-center barcodes.
-- Added contrast-enhanced attempts without replacing the normal image path.
-- Added two-read confirmation within a short time window.
-- Added rear-camera constraints with progressively simpler fallbacks.
-- Added optional continuous autofocus and modest zoom when supported.
-- Added flashlight and camera-switch controls based on reported device capabilities.
-- Added native `BarcodeDetector` use where available while keeping bundled ZXing as the main cross-browser fallback.
-- Added 45-second live scanning with clearer distance, blur, glare, and lighting instructions.
-- Added multi-pass photo decoding across full-frame and center-crop variants.
-- Added a direct read-only Open Food Facts product lookup when no proxy is configured.
-- Preserved optional proxy-first operation through `config.js`.
-- Corrected serving-based calorie, macro, and sodium calculations.
-- Cached successful product lookups locally by barcode.
-- Preserved manual creation when a product is missing or the database is unavailable.
-- Added explicit cleanup for late camera streams, dialog closing, successful scans, visibility changes, and errors.
-- Updated cache-busted files and the service-worker cache to `phactoryfit-v1.3.0`.
-
-## Browser and barcode tests — 7/7 passed
-
-1. Mobile-width load and horizontal-overflow check
-2. Manual barcode lookup, Enter-key submission, serving math, diary addition, and local product reuse
-3. Real EAN-13 barcode decoding from a generated PNG using the bundled ZXing library
-4. Live MediaStream decoding with the real ZXing decoder, torch UI, multi-camera UI, and product result
+1. Application load and horizontal-overflow check
+2. Manual barcode lookup, serving conversion, diary insertion, and local cache reuse
+3. Real EAN-13 barcode image decoding
+4. Simulated live camera decoding, torch control, and camera-switch UI
 5. Camera permission-denied handling
-6. Late stream shutdown when the modal closes during a delayed permission request
-7. Product-missing and product-database-unavailable fallback handling
+6. Camera cleanup when the scanner closes during delayed permission
+7. Missing-product and offline-database fallbacks
+8. Generated nutrition correction and replacement workflow
 
-The generated EAN-13 test barcode decoded as `3017624010701`. For a 37-gram serving, the test product correctly normalized 539 kcal/100 g to approximately 199 kcal and 6.3 g protein/100 g to approximately 2.3 g protein.
+The product fixture verified conversion of per-100 g nutrition into a 37 g serving, including calories, protein, saturated fat, cholesterol, sodium, carbohydrates, sugars, and fat.
 
-## Static and package checks — 58/58 passed
+## Static and deployment audit
 
-The static audit passed:
+**64/64 checks passed:**
 
-- JavaScript syntax for the app, service worker, and configuration
-- Required project files
-- Manifest JSON, standalone mode, start URL, standard icons, and maskable icons
-- Exact image dimensions for Apple, favicon, standard, and maskable assets
-- Service-worker cache version and every shell asset reference
-- Cache-busted application, style, and scanner references
-- Apple touch-icon declaration
-- Camera, center-crop, confirmation, photo, fallback-constraint, torch, camera-switch, and cleanup implementations
-- Direct product lookup and optional proxy configuration
-- Serving-based nutrient normalization
-- Scanner guide styling
-- Bundled ZXing reader and license
-- Credential, token, private-key, and obvious embedded-password scan
+- JavaScript syntax for app, service worker, and configuration
+- Required deployment files
+- Manifest parsing and standalone mode
+- Standard, Apple touch, and maskable icon dimensions
+- Service-worker asset references and v1.4.0 cache
+- Cache-busted HTML asset references
+- Camera and scanner code paths
+- Product lookup and serving normalization
+- Generated nutrition-facts renderer
+- Correction workflow
+- Extended nutrient persistence
+- Barcode scanner library and license
+- Credential/private-key pattern scan
 
-## Remaining physical-device check
+## Security and privacy
 
-A sandbox cannot reproduce the exact autofocus behavior, camera selection, permission state, and glare conditions of the user's iPhone. The automated test did use a real browser MediaStream, the bundled ZXing decoder, and a generated EAN-13 image rather than merely mocking a returned barcode value. After deployment, one physical iPhone test should verify rear-camera focus and permission on the actual GitHub Pages origin.
+- No API keys, passwords, access tokens, or private keys are included.
+- Food, diary, weight, and corrected barcode data remain in browser local storage unless exported by the user.
+- The online lookup is read-only.
+- Imported backups continue to pass through existing normalization and validation.
+
+## Remaining device-dependent checks
+
+The automated environment cannot physically evaluate a specific iPhone camera's autofocus, lens switching, Safari permission state, or glare conditions. After GitHub Pages deployment, perform one physical scan of a common packaged food, confirm the generated facts against the package, add it to the diary, then scan it again to verify local reuse.
+
+## Result
+
+**PASS — ready for GitHub Pages deployment and physical iPhone smoke testing.**

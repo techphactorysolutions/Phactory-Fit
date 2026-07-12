@@ -91,6 +91,9 @@ function normalizeFood(raw, fallbackId = uid('food')) {
     fat: round(toNumber(raw.fat, 0, 0, 10000), 4),
     fiber: round(toNumber(raw.fiber, 0, 0, 10000), 4),
     sugar: round(toNumber(raw.sugar, 0, 0, 10000), 4),
+    saturatedFat: round(toNumber(raw.saturatedFat ?? raw.saturated_fat, 0, 0, 10000), 4),
+    transFat: round(toNumber(raw.transFat ?? raw.trans_fat, 0, 0, 10000), 4),
+    cholesterol: round(toNumber(raw.cholesterol, 0, 0, 1000000), 4),
     sodium: round(toNumber(raw.sodium, 0, 0, 1000000), 4),
     aliases: Array.isArray(raw.aliases) ? raw.aliases.map(alias => String(alias).toLowerCase()).filter(Boolean).slice(0, 30) : [],
     barcode: raw.barcode ? String(raw.barcode).replace(/\D/g, '').slice(0, 14) : null,
@@ -661,10 +664,12 @@ function showFoodQuantity(food, meal = modalContext.meal) {
   $('#modalContent').innerHTML = `<form id="addFoodForm" class="modal-form"><div class="search-result"><strong>${escapeHtml(food.name)}</strong><small>${escapeHtml(food.serving)} · ${round(food.calories)} kcal · ${round(food.protein, 1)}g protein</small></div><label>Meal<select name="meal">${mealOptions(selectedMeal)}</select></label><label>Number of servings<input name="quantity" type="number" step="0.01" min="0.01" max="1000" value="1" required></label><input name="foodId" type="hidden" value="${escapeHtml(food.id)}"><button class="primary-button" type="submit">Add to diary</button></form>`;
 }
 
-function showCustomFoodForm(barcode = '', meal = modalContext.meal) {
+function showCustomFoodForm(barcode = '', meal = modalContext.meal, presetFood = null) {
   const selectedMeal = MEALS.includes(meal) ? meal : 'Breakfast';
   modalContext.meal = selectedMeal;
-  $('#modalContent').innerHTML = `<form id="customFoodForm" class="modal-form">${barcode ? `<p class="form-note">This food will be linked to barcode ${escapeHtml(barcode)} for future scans.</p>` : ''}<input name="barcode" type="hidden" value="${escapeHtml(barcode)}"><input name="meal" type="hidden" value="${selectedMeal}"><label>Food name<input name="name" maxlength="200" required></label><label>Brand<input name="brand" maxlength="200" value="Custom"></label><label>Serving description<input name="serving" maxlength="200" placeholder="1 serving, 100 g, 1 cup" required></label><div class="two-col"><label>Calories<input name="calories" type="number" step="0.1" min="0" max="100000" required></label><label>Protein (g)<input name="protein" type="number" step="0.1" min="0" max="10000" required></label></div><div class="two-col"><label>Carbs (g)<input name="carbs" type="number" step="0.1" min="0" max="10000" value="0" required></label><label>Fat (g)<input name="fat" type="number" step="0.1" min="0" max="10000" value="0" required></label></div><div class="two-col"><label>Fiber (g)<input name="fiber" type="number" step="0.1" min="0" max="10000" value="0"></label><label>Sodium (mg)<input name="sodium" type="number" step="0.1" min="0" max="1000000" value="0"></label></div><button class="primary-button" type="submit">Save food</button></form>`;
+  const preset = presetFood ? normalizeFood(presetFood, presetFood.id || uid('custom')) : null;
+  const value = (key, fallback = '') => escapeHtml(preset?.[key] ?? fallback);
+  $('#modalContent').innerHTML = `<form id="customFoodForm" class="modal-form">${barcode ? `<p class="form-note">This food will be linked to barcode ${escapeHtml(barcode)} for future scans.</p>` : ''}${preset ? '<p class="form-note">Correct any value that does not match the package label. Your corrected version will replace the community result on this device.</p>' : ''}<input name="barcode" type="hidden" value="${escapeHtml(barcode)}"><input name="meal" type="hidden" value="${selectedMeal}"><input name="replaceFoodId" type="hidden" value="${escapeHtml(preset?.id || '')}"><label>Food name<input name="name" maxlength="200" value="${value('name')}" required></label><label>Brand<input name="brand" maxlength="200" value="${value('brand','Custom')}"></label><label>Serving description<input name="serving" maxlength="200" value="${value('serving')}" placeholder="1 serving, 100 g, 1 cup" required></label><div class="two-col"><label>Calories<input name="calories" type="number" step="any" min="0" max="100000" value="${value('calories')}" required></label><label>Protein (g)<input name="protein" type="number" step="any" min="0" max="10000" value="${value('protein')}" required></label></div><div class="two-col"><label>Carbs (g)<input name="carbs" type="number" step="any" min="0" max="10000" value="${value('carbs',0)}" required></label><label>Fat (g)<input name="fat" type="number" step="any" min="0" max="10000" value="${value('fat',0)}" required></label></div><div class="two-col"><label>Fiber (g)<input name="fiber" type="number" step="any" min="0" max="10000" value="${value('fiber',0)}"></label><label>Sugar (g)<input name="sugar" type="number" step="any" min="0" max="10000" value="${value('sugar',0)}"></label></div><div class="two-col"><label>Saturated fat (g)<input name="saturatedFat" type="number" step="any" min="0" max="10000" value="${value('saturatedFat',0)}"></label><label>Trans fat (g)<input name="transFat" type="number" step="any" min="0" max="10000" value="${value('transFat',0)}"></label></div><div class="two-col"><label>Cholesterol (mg)<input name="cholesterol" type="number" step="any" min="0" max="1000000" value="${value('cholesterol',0)}"></label><label>Sodium (mg)<input name="sodium" type="number" step="any" min="0" max="1000000" value="${value('sodium',0)}"></label></div><button class="primary-button" type="submit">${preset ? 'Save corrected nutrition' : 'Save food'}</button></form>`;
 }
 
 async function fetchWithTimeout(url, timeoutMs = 10000) {
@@ -699,6 +704,45 @@ function productNutrientForServing(product, names, factor = 1) {
   return 0;
 }
 
+function productNutrientMilligramsForServing(product, names, factor = 1) {
+  const nutrition = product?.nutriments || product?.nutrition || {};
+  for (const name of names) {
+    const serving = Number(nutrition[`${name}_serving`]);
+    if (!Number.isFinite(serving)) continue;
+    const unit = String(nutrition[`${name}_unit`] || 'g').toLowerCase();
+    if (unit === 'mg') return serving;
+    if (unit === 'µg' || unit === 'ug' || unit === 'mcg') return serving / 1000;
+    return serving * 1000;
+  }
+  for (const name of names) {
+    const per100 = Number(nutrition[`${name}_100g`] ?? nutrition[name]);
+    if (!Number.isFinite(per100)) continue;
+    const unit = String(nutrition[`${name}_unit`] || 'g').toLowerCase();
+    const value = per100 * factor;
+    if (unit === 'mg') return value;
+    if (unit === 'µg' || unit === 'ug' || unit === 'mcg') return value / 1000;
+    return value * 1000;
+  }
+  return 0;
+}
+
+function nutritionFactRow(label, value, unit = 'g', indent = false) {
+  return `<div class="nutrition-fact-row${indent ? ' indent' : ''}"><span>${escapeHtml(label)}</span><strong>${round(toNumber(value, 0, 0, 1000000), unit === 'mg' ? 0 : 1)}${unit}</strong></div>`;
+}
+
+function barcodeNutritionCard(food, code, meal, sourceNote = '') {
+  const selectedMeal = MEALS.includes(meal) ? meal : 'Breakfast';
+  return `<div class="barcode-product-heading"><div><span class="badge">Nutrition generated</span><h3>${escapeHtml(food.name)}</h3><p>${escapeHtml(food.brand)} · Barcode ${escapeHtml(code)}</p></div></div><section class="nutrition-label" aria-label="Generated nutrition facts for ${escapeHtml(food.name)}"><div class="nutrition-label-title">Nutrition Facts</div><div class="nutrition-serving"><span>Serving size</span><strong>${escapeHtml(food.serving)}</strong></div><div class="nutrition-heavy-rule"></div><div class="nutrition-amount">Amount per serving</div><div class="nutrition-calories"><span>Calories</span><strong>${round(food.calories)}</strong></div><div class="nutrition-medium-rule"></div>${nutritionFactRow('Total Fat', food.fat)}${nutritionFactRow('Saturated Fat', food.saturatedFat, 'g', true)}${nutritionFactRow('Trans Fat', food.transFat, 'g', true)}${nutritionFactRow('Cholesterol', food.cholesterol, 'mg')}${nutritionFactRow('Sodium', food.sodium, 'mg')}${nutritionFactRow('Total Carbohydrate', food.carbs)}${nutritionFactRow('Dietary Fiber', food.fiber, 'g', true)}${nutritionFactRow('Total Sugars', food.sugar, 'g', true)}${nutritionFactRow('Protein', food.protein)}<div class="nutrition-heavy-rule bottom"></div><p class="nutrition-label-footnote">Automatically generated from the barcode database per listed serving. Compare it with the package label before logging.</p></section>${sourceNote ? `<p class="barcode-source-note">${escapeHtml(sourceNote)}</p>` : ''}<form id="barcodeAddForm" class="barcode-add-form"><label>Meal<select name="meal">${mealOptions(selectedMeal)}</select></label><label>Servings<input name="quantity" type="number" step="0.01" min="0.01" max="1000" value="1" required></label><input name="foodId" type="hidden" value="${escapeHtml(food.id)}"><div class="inline-actions"><button type="submit" id="addBarcodeFood" class="primary-button">Add to diary</button><button type="button" id="editBarcodeNutrition" class="secondary-button">Correct nutrition</button></div></form>`;
+}
+
+function showBarcodeNutrition(food, code, meal, sourceNote = '') {
+  const result = $('#barcodeResult');
+  if (!result) return;
+  result.innerHTML = barcodeNutritionCard(food, code, meal, sourceNote);
+  const edit = $('#editBarcodeNutrition');
+  if (edit) edit.onclick = () => showCustomFoodForm(code, meal, food);
+}
+
 function normalizeOpenFoodFactsProduct(product, code) {
   if (!product || (!product.product_name && !product.name)) return null;
   const rawServing = String(product.serving_size || product.serving || '').trim();
@@ -727,32 +771,48 @@ function normalizeOpenFoodFactsProduct(product, code) {
     fat:productNutrientForServing(product, ['fat'], factor),
     fiber:productNutrientForServing(product, ['fiber'], factor),
     sugar:productNutrientForServing(product, ['sugar','sugars'], factor),
+    saturatedFat:productNutrientForServing(product, ['saturated-fat','saturated_fat'], factor),
+    transFat:productNutrientForServing(product, ['trans-fat','trans_fat'], factor),
+    cholesterol:productNutrientMilligramsForServing(product, ['cholesterol'], factor),
     sodium:sodiumMg,
     aliases:[],source:'Open Food Facts',barcode:code
   }, `off-${code}`);
 }
 
+function barcodeDatabaseCodes(code) {
+  const normalized = String(code || '').replace(/\D/g, '');
+  const candidates = [normalized];
+  if (normalized.length === 12) candidates.push(`0${normalized}`);
+  if (normalized.length === 13 && normalized.startsWith('0')) candidates.push(normalized.slice(1));
+  return [...new Set(candidates.filter(candidate => /^\d{8,14}$/.test(candidate)))];
+}
+
 async function fetchBarcodeProduct(code) {
   const proxy = window.PHACTORYFIT_CONFIG?.offProxyUrl?.trim();
-  const urls = [];
-  if (proxy) urls.push(`${proxy}${proxy.includes('?') ? '&' : '?'}barcode=${encodeURIComponent(code)}`);
-  const fields = 'code,status,status_verbose,product_name,brands,serving_size,serving_quantity,nutriments';
-  urls.push(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${encodeURIComponent(fields)}&app_name=PhactoryFit&app_version=1.3.0`);
+  const fields = 'code,status,status_verbose,product_name,brands,serving_size,serving_quantity,quantity,nutrition_data_per,nutriments';
   let lastError = null;
-  for (const url of urls) {
-    try {
-      const response = await fetchWithTimeout(url, 12000);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      if (data?.status === 0) return {found:false, product:null};
-      const product = data?.product || data;
-      if (!product || (!product.product_name && !product.name)) return {found:false, product:null};
-      return {found:true, product};
-    } catch (error) {
-      lastError = error;
-      console.warn('Barcode product source failed', error);
+  let reachedDatabase = false;
+  for (const candidate of barcodeDatabaseCodes(code)) {
+    const urls = [];
+    if (proxy) urls.push(`${proxy}${proxy.includes('?') ? '&' : '?'}barcode=${encodeURIComponent(candidate)}`);
+    urls.push(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(candidate)}.json?fields=${encodeURIComponent(fields)}&app_name=PhactoryFit&app_version=1.4.0`);
+    for (const url of urls) {
+      try {
+        const response = await fetchWithTimeout(url, 12000);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        reachedDatabase = true;
+        const data = await response.json();
+        if (data?.status === 0) continue;
+        const product = data?.product || data;
+        if (!product || (!product.product_name && !product.name)) continue;
+        return {found:true, product, matchedCode:candidate};
+      } catch (error) {
+        lastError = error;
+        console.warn('Barcode product source failed', error);
+      }
     }
   }
+  if (reachedDatabase) return {found:false, product:null};
   throw lastError || new Error('Product database unavailable');
 }
 
@@ -766,14 +826,14 @@ async function lookupBarcode(code) {
   }
   const selectedMeal = MEALS.includes($('#barcodeMeal')?.value) ? $('#barcodeMeal').value : modalContext.meal;
   modalContext.meal = selectedMeal;
-  const localFood = allFoods().find(food => String(food.barcode || '') === normalizedCode);
+  const lookupCodes = barcodeDatabaseCodes(normalizedCode);
+  const localFood = allFoods().find(food => lookupCodes.includes(String(food.barcode || '')));
   if (localFood) {
-    result.innerHTML = `<div class="search-result"><strong>${escapeHtml(localFood.name)}</strong><small>${escapeHtml(localFood.brand)} · ${escapeHtml(localFood.serving)} · ${round(localFood.calories)} kcal · ${round(localFood.protein, 1)}g protein</small></div><button type="button" id="addBarcodeFood" class="primary-button">Add product</button>`;
-    $('#addBarcodeFood').onclick = () => showFoodQuantity(localFood, selectedMeal);
+    showBarcodeNutrition(localFood, normalizedCode, selectedMeal, 'Saved on this device. No internet lookup was needed.');
     return;
   }
 
-  result.innerHTML = '<p class="form-note camera-status">Looking up product nutrition…</p>';
+  result.innerHTML = '<p class="form-note camera-status">Barcode detected. Generating nutrition facts…</p>';
   try {
     const response = await fetchBarcodeProduct(normalizedCode);
     if (response.found) {
@@ -783,14 +843,13 @@ async function lookupBarcode(code) {
       if (existingIndex >= 0) state.customFoods[existingIndex] = normalizedFood;
       else state.customFoods.push(normalizedFood);
       saveState();
-      result.innerHTML = `<div class="search-result"><strong>${escapeHtml(normalizedFood.name)}</strong><small>${escapeHtml(normalizedFood.brand)} · ${escapeHtml(normalizedFood.serving)} · ${round(normalizedFood.calories)} kcal · ${round(normalizedFood.protein, 1)}g protein</small></div><p class="barcode-source-note">Community nutrition data—compare it with the package label before saving.</p><button type="button" id="addBarcodeFood" class="primary-button">Add product</button>`;
-      $('#addBarcodeFood').onclick = () => showFoodQuantity(normalizedFood, selectedMeal);
+      showBarcodeNutrition(normalizedFood, normalizedCode, selectedMeal, 'Community product data from Open Food Facts. Verify it against the package label.');
       return;
     }
-    result.innerHTML = '<p class="form-note">The barcode scanned correctly, but this product is not in the food database yet.</p><button type="button" id="teachBarcodeFood" class="primary-button">Create and remember food</button>';
+    result.innerHTML = '<p class="form-note">The barcode scanned correctly, but this product is not in the food database yet.</p><button type="button" id="teachBarcodeFood" class="primary-button">Enter nutrition once</button>';
   } catch (error) {
     console.warn('Barcode lookup failed', error);
-    result.innerHTML = '<p class="form-note">The barcode scanned correctly, but the online product database could not be reached. You can still create the food once and PhactoryFit will remember it offline.</p><button type="button" id="teachBarcodeFood" class="primary-button">Create and remember food</button>';
+    result.innerHTML = '<p class="form-note">The barcode scanned correctly, but the online nutrition database could not be reached. Enter the label once and PhactoryFit will remember it for future scans.</p><button type="button" id="teachBarcodeFood" class="primary-button">Enter nutrition once</button>';
   }
   $('#teachBarcodeFood').onclick = () => showCustomFoodForm(normalizedCode, selectedMeal);
 }
@@ -1347,7 +1406,7 @@ document.addEventListener('submit', event => {
   const form = event.target;
   const data = Object.fromEntries(new FormData(form));
 
-  if (form.id === 'addFoodForm') {
+  if (form.id === 'addFoodForm' || form.id === 'barcodeAddForm') {
     const food = allFoods().find(item => item.id === data.foodId);
     const quantity = toNumber(data.quantity, NaN, 0.01, 1000);
     if (!food || !Number.isFinite(quantity) || !MEALS.includes(data.meal)) { toast('Check the serving amount and meal.'); return; }
@@ -1360,12 +1419,15 @@ document.addEventListener('submit', event => {
   }
 
   if (form.id === 'customFoodForm') {
+    const replacementId = String(data.replaceFoodId || '').trim();
     const food = normalizeFood({
-      id:uid('custom'),name:String(data.name || '').trim(),brand:String(data.brand || '').trim() || 'Custom',serving:String(data.serving || '').trim(),
-      calories:data.calories,protein:data.protein,carbs:data.carbs,fat:data.fat,fiber:data.fiber,sugar:0,sodium:data.sodium,aliases:[],barcode:data.barcode || null
+      id:replacementId || uid('custom'),name:String(data.name || '').trim(),brand:String(data.brand || '').trim() || 'Custom',serving:String(data.serving || '').trim(),
+      calories:data.calories,protein:data.protein,carbs:data.carbs,fat:data.fat,fiber:data.fiber,sugar:data.sugar,saturatedFat:data.saturatedFat,transFat:data.transFat,cholesterol:data.cholesterol,sodium:data.sodium,aliases:[],barcode:data.barcode || null,source:'User verified'
     });
     if (!food || !food.serving) { toast('Complete the required food fields.'); return; }
-    state.customFoods.push(food);
+    const existingIndex = state.customFoods.findIndex(item => item.id === replacementId || (food.barcode && item.barcode === food.barcode));
+    if (existingIndex >= 0) state.customFoods[existingIndex] = food;
+    else state.customFoods.push(food);
     saveState();
     showFoodQuantity(food, MEALS.includes(data.meal) ? data.meal : modalContext.meal);
     return;

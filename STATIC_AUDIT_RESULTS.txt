@@ -1,0 +1,65 @@
+PASS app.js JavaScript syntax 
+PASS service-worker.js JavaScript syntax 
+PASS config.js JavaScript syntax 
+PASS index.html exists 
+PASS styles.css exists 
+PASS app.js exists 
+PASS config.js exists 
+PASS service-worker.js exists 
+PASS manifest.webmanifest exists 
+PASS apple-touch-icon.png exists 
+PASS vendor/zxing-browser.min.js exists 
+PASS vendor/ZXING_LICENSE.txt exists 
+PASS manifest JSON parses 
+PASS manifest standalone display 
+PASS manifest start URL 
+PASS manifest standard 192 icon 
+PASS manifest standard 512 icon 
+PASS manifest maskable icons 
+PASS apple-touch-icon.png dimensions 
+PASS assets/apple-touch-icon-180.png dimensions 
+PASS assets/favicon-32.png dimensions 
+PASS assets/icon-192.png dimensions 
+PASS assets/icon-512.png dimensions 
+PASS assets/icon-maskable-192.png dimensions 
+PASS assets/icon-maskable-512.png dimensions 
+PASS service-worker cache version 
+PASS service-worker asset index.html 
+PASS service-worker asset styles.css 
+PASS service-worker asset app.js 
+PASS service-worker asset config.js 
+PASS service-worker asset vendor/zxing-browser.min.js 
+PASS service-worker asset manifest.webmanifest 
+PASS service-worker asset apple-touch-icon.png 
+PASS service-worker asset assets/favicon-32.png 
+PASS service-worker asset assets/apple-touch-icon-180.png 
+PASS service-worker asset assets/icon-192.png 
+PASS service-worker asset assets/icon-512.png 
+PASS service-worker asset assets/icon-maskable-192.png 
+PASS service-worker asset assets/icon-maskable-512.png 
+PASS app versioned JS reference 
+PASS scanner versioned reference 
+PASS styles versioned reference 
+PASS Apple touch icon declared 
+PASS live camera uses getUserMedia 
+PASS center crop decoder present 
+PASS stable scan confirmation present 
+PASS photo multi-attempt decoder present 
+PASS camera constraints fallback present 
+PASS torch control present 
+PASS camera switching present 
+PASS late camera stream cleanup present 
+PASS direct product lookup present 
+PASS proxy remains optional 
+PASS serving nutrient normalization present 
+PASS scanner guide styling present 
+PASS generated nutrition facts card present 
+PASS automatic barcode result renderer present 
+PASS barcode add form present 
+PASS nutrition correction flow present 
+PASS extended nutrition fields present 
+PASS nutrition label styling present 
+PASS ZXing 1D reader available 
+PASS ZXing license included 
+PASS credential and private-key scan 
+RESULT 64/64 passed

@@ -1,85 +1,98 @@
-# PhactoryFit v1.3.0
+# PhactoryFit v1.4.0
 
-PhactoryFit is an original, mobile-first nutrition and fitness tracker designed by **Tech Phactory Solutions LLC**. It provides a streamlined calorie-tracker workflow without copying MyFitnessPal branding, code, or interface assets.
+PhactoryFit is an original, mobile-first nutrition and fitness tracker designed by **Tech Phactory Solutions LLC**. It provides barcode food logging, calorie and macro tracking, weight progress, workouts, habits, local backup, and an installable iPhone-friendly PWA without copying MyFitnessPal branding, code, or interface assets.
 
-## v1.3.0 barcode repair
+## v1.4.0 — Automatic nutrition facts
 
-This release replaces the earlier barcode workflow with a more reliable iPhone-oriented scanner and product lookup path.
+After a UPC or EAN barcode is scanned, PhactoryFit now automatically:
 
-### Scanner improvements
+1. Stops the camera after a stable barcode read.
+2. Looks up the product in the configured product database.
+3. Converts per-100 g nutrition into the product's listed serving size when necessary.
+4. Generates a complete Nutrition Facts-style card inside the app.
+5. Lets the user select a meal and number of servings.
+6. Adds the product to the diary with one tap.
+7. Saves the product locally for faster future scans and offline reuse.
 
-- Scans the center barcode region at higher effective resolution instead of relying only on the entire camera frame.
-- Confirms the same code twice before accepting it, reducing partial and false reads.
-- Tries multiple rear-camera constraint profiles when iPhone Safari rejects an advanced profile.
-- Requests continuous focus and a light zoom only when the camera reports that those features are supported.
-- Adds a flashlight control when the active camera exposes torch support.
-- Adds camera switching when more than one video input is available.
-- Uses both the browser-native barcode detector, when available, and the bundled ZXing 1D decoder.
-- Extends the scan timeout to 45 seconds and provides clearer positioning guidance.
-- Stops a late camera stream correctly when the scanner is closed while permission is still pending.
+Generated facts include:
 
-### Photo and product improvements
+- Serving size
+- Calories
+- Total fat
+- Saturated fat
+- Trans fat
+- Cholesterol
+- Sodium
+- Total carbohydrates
+- Dietary fiber
+- Total sugars
+- Protein
 
-- Barcode photos are decoded through several full-frame, center-crop, and contrast-enhanced passes.
-- Unknown codes now attempt a direct public Open Food Facts lookup even when no custom proxy is configured.
-- `config.js` still supports an optional proxy override for production control.
-- Serving-size nutrition is calculated from the product's actual serving quantity instead of incorrectly treating per-100-gram values as one serving.
-- Successfully retrieved products are cached locally for later offline scans.
-- Missing or unavailable online products still fall back to “Create and remember food.”
+A **Correct nutrition** action opens a prefilled form so community-sourced values can be matched to the physical package label. The corrected record replaces the online result on that device.
 
-## Included
+## Barcode workflow
+
+- Live rear-camera barcode scanning
+- Center-frame scanning guide
+- Stable two-read confirmation
+- Torch control when supported
+- Front/rear camera switching when supported
+- Barcode-photo fallback
+- Manual UPC/EAN entry fallback
+- UPC-A/EAN-13 leading-zero compatibility
+- Direct read-only Open Food Facts product lookup
+- Optional proxy-first lookup through `config.js`
+- Local product memory after a successful lookup or correction
+
+A barcode identifies a product; it does not directly contain the nutrition panel. Automatic generation therefore depends on a matching product record. When a product is missing or the database is unavailable, PhactoryFit offers a one-time nutrition entry and remembers it for later scans.
+
+## Other included features
 
 - Daily calories, protein, carbohydrates, and fat goals
-- Protein-floor protection and exact protein-rescue shortcuts
+- Protein-floor protection and protein-rescue shortcuts
 - Breakfast, lunch, dinner, and snack diary
 - Starter food library and custom foods
-- Local barcode learning
-- Bundled live barcode scanning for iPhone/Safari-compatible browsers
-- “Take barcode photo” fallback
-- Public product lookup with optional proxy override
-- Browser voice-to-search logging where supported
 - Workout, water, steps, sleep, and weight logging
 - Daily consistency score
 - Weight chart and trend-aware calorie guidance
-- Validated local storage with legacy/corrupt-data repair
+- Local data validation and repair
 - JSON backup export and validated import
-- Installable PWA shell with offline caching
+- Installable PWA shell with offline app caching
 - GitHub Pages compatibility with no build step
 
 ## GitHub Pages deployment
 
-1. Upload **all files and folders inside this package** to the repository root, replacing the earlier version.
-2. Confirm GitHub Pages is deploying from the `main` branch and `/ (root)`.
-3. Wait for the deployment to finish.
-4. Open the GitHub Pages URL in Safari—not the downloaded HTML file.
-5. Refresh twice so the `phactoryfit-v1.3.0` cache replaces the previous scanner files.
-6. Close and reopen the installed PhactoryFit Home Screen app.
+1. Upload all files and folders in this package to the repository root, replacing the prior version.
+2. Confirm GitHub Pages deploys from the `main` branch and `/ (root)`.
+3. Wait for deployment to complete.
+4. Open the GitHub Pages address in Safari.
+5. Refresh twice so the `phactoryfit-v1.4.0` cache replaces older files.
+6. Fully close and reopen the installed Home Screen app.
 7. Approve camera access when prompted.
 
-Existing diary data remains compatible because the browser storage key is unchanged.
+Existing diary data remains compatible because the local storage key is unchanged.
 
 ## Camera requirements
 
-- The app must be served through HTTPS, such as GitHub Pages.
+- The app must be served over HTTPS, such as GitHub Pages.
 - Camera access will not work when opening `index.html` directly from the Files app.
-- Safari camera permission must be allowed for the GitHub Pages site.
-- Keep the full barcode inside the green frame, roughly 6–10 inches from the camera.
-- Avoid glare and do not place the camera so close that the bars become blurry.
-- Use **Turn on light** in dim conditions when the camera supports it.
-- “Take barcode photo” remains available as a fallback.
+- Safari camera permission must be enabled for the deployed site.
+- Keep the full barcode inside the green guide, roughly 6–10 inches from the camera.
+- Avoid glare and move slightly farther away when the bars look blurry.
 
 ## Product lookup configuration
 
-By default, PhactoryFit performs a public read-only Open Food Facts lookup after a successful scan. No API key or password is included.
+By default, PhactoryFit performs a public read-only Open Food Facts lookup after a successful scan. No API key, password, or private credential is included.
 
-`config.js` contains an optional `offProxyUrl` value. Set it only when you want requests routed through your own compliant serverless endpoint. When present, the proxy is attempted before the public endpoint.
+`config.js` contains an optional `offProxyUrl`. When populated, that endpoint is attempted before the direct public lookup and should accept a `barcode` query parameter.
 
-## Important limitations
+## Limitations
 
-- Community food data must be compared with the package label before use.
+- Community product data should be compared with the package label.
+- Products absent from the database require one-time manual nutrition entry.
 - Camera focus and permission behavior vary by iPhone model and iOS/Safari version.
-- The simulated browser test used a real MediaStream and a generated EAN-13 barcode, but the final deployed package still requires a physical-device smoke test.
-- Apple Health requires a later native Capacitor wrapper; a normal website cannot directly access HealthKit.
+- Automated tests simulate a real MediaStream and decode a generated EAN-13 image, but a physical-device smoke test is still required after deployment.
+- Apple Health requires a later native wrapper because a normal website cannot directly access HealthKit.
 - Fitness recommendations are general guidance and are not medical care.
 - Clearing Safari website data removes local entries unless a backup was exported.
 

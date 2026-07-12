@@ -3,7 +3,7 @@
 
 .barcode-photo-button{display:block;width:100%;cursor:pointer}
 
-/* v1.3 barcode scanner */
+/* v1.3 barcode scanner foundation */
 .barcode-camera-shell{isolation:isolate;aspect-ratio:3/4;min-height:340px;max-height:58vh}
 .barcode-camera-shell video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .barcode-scan-guide{left:5%;right:5%;top:47%;height:31%;border-width:3px;border-radius:14px;display:flex;align-items:flex-end;justify-content:center}
@@ -18,3 +18,6 @@
 @keyframes barcode-sweep{from{transform:translateY(-22px)}to{transform:translateY(22px)}}
 @media(max-width:520px){.barcode-camera-shell{min-height:360px}.barcode-scan-guide{height:29%}}
 @media(prefers-reduced-motion:reduce){.barcode-scan-guide::before{animation:none}}
+
+/* v1.4 automatically generated nutrition facts */
+.barcode-product-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:14px 0 10px}.barcode-product-heading h3{font-size:1.18rem;margin:8px 0 3px}.barcode-product-heading p{margin:0;color:var(--muted);font-size:.72rem;line-height:1.4}.nutrition-label{background:#fff;color:#090909;border:2px solid #111;border-radius:4px;padding:10px 11px;margin:10px 0 12px;font-family:Arial,Helvetica,sans-serif;box-shadow:none}.nutrition-label-title{font-size:2rem;font-weight:900;line-height:.95;letter-spacing:-.06em;border-bottom:1px solid #111;padding-bottom:5px}.nutrition-serving{display:flex;justify-content:space-between;gap:12px;padding:6px 0 5px;font-size:.82rem}.nutrition-serving strong{text-align:right}.nutrition-heavy-rule{height:9px;background:#111;margin:0}.nutrition-heavy-rule.bottom{margin-top:2px;height:6px}.nutrition-medium-rule{height:4px;background:#111;margin:2px 0 0}.nutrition-amount{font-size:.64rem;font-weight:700;padding-top:4px}.nutrition-calories{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1px solid #111;padding:0 0 3px;font-size:1.45rem;font-weight:900}.nutrition-calories strong{font-size:2.15rem;line-height:1}.nutrition-fact-row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #777;padding:4px 0 3px;font-size:.78rem}.nutrition-fact-row strong{font-weight:800}.nutrition-fact-row.indent span{padding-left:14px}.nutrition-label-footnote{font-size:.58rem;line-height:1.35;margin:6px 0 0}.barcode-add-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.barcode-add-form label{display:grid;gap:6px;font-size:.78rem;font-weight:750}.barcode-add-form .inline-actions{grid-column:1/-1}.barcode-add-form .inline-actions>*{min-height:46px}@media(max-width:520px){.nutrition-label-title{font-size:1.75rem}.nutrition-calories{font-size:1.25rem}.nutrition-calories strong{font-size:1.95rem}.barcode-add-form{grid-template-columns:1fr 1fr}}
