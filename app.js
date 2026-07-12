@@ -1,7 +1,7 @@
 'use strict';
 
 const STORAGE_KEY = 'phactoryfit.v1';
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 const MAX_LOG_ENTRIES_PER_DAY = 5000;
 const MAX_CUSTOM_FOODS = 10000;
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -333,16 +333,50 @@ function findFoodById(id) {
   return allFoods().find(food => food.id === key) || restaurantFoods().find(food => food.id === key) || onlineFoodResults.find(food => food.id === key) || null;
 }
 
-const RESTAURANT_SEARCH_STOP_WORDS = new Set(['a','an','and','at','food','foods','for','from','in','item','items','me','menu','near','of','order','restaurant','restaurants','the','tonight','today','tomorrow']);
+const RESTAURANT_SEARCH_STOP_WORDS = new Set(['a','an','and','at','food','foods','for','from','in','item','items','me','menu','near','n','of','order','restaurant','restaurants','the','tonight','today','tomorrow']);
+
+const RESTAURANT_QUICK_SEARCHES = Object.freeze([
+  {label:"McDonald’s",query:"McDonald's breakfast"},
+  {label:'Chick-fil-A',query:'Chick-fil-A'},
+  {label:'Taco Bell',query:'Taco Bell'},
+  {label:'Subway',query:'Subway'},
+  {label:"Arby’s",query:"Arby's"},
+  {label:'Sonic',query:'Sonic'},
+  {label:'Five Guys',query:'Five Guys'},
+  {label:'Buffalo Wild Wings',query:'Buffalo Wild Wings'},
+  {label:'Starbucks',query:'Starbucks breakfast'},
+  {label:'Chipotle',query:'Chipotle'},
+  {label:'Panera Bread',query:'Panera Bread'}
+]);
 
 function normalizeSearchText(value = '') {
   let text = String(value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
   text = text.replace(/&/g, ' and ').replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   const replacements = [
     [/\bmickey\s*d(?:s)?\b/g, 'mcdonalds'],
-    [/\bmcd(?:s|onalds)?\b/g, 'mcdonalds'],
+    [/\bmcd(?:s|onalds?)?\b/g, 'mcdonalds'],
+    [/\bcfa\b/g, 'chick fil a'],
     [/\bchickfila\b/g, 'chick fil a'],
-    [/\bchic\s*fil\s*a\b/g, 'chick fil a']
+    [/\bchic+k?\s*fil+\s*a\b/g, 'chick fil a'],
+    [/\btbell\b/g, 'taco bell'],
+    [/\bb\s*dubs?\b/g, 'buffalo wild wings'],
+    [/\bbdubs?\b/g, 'buffalo wild wings'],
+    [/\bbww\b/g, 'buffalo wild wings'],
+    [/\bfiveguys\b/g, 'five guys'],
+    [/\bsonic\s*drive\s*in\b/g, 'sonic'],
+    [/\bchipotle\s*mexican\s*grill\b/g, 'chipotle'],
+    [/\bpanera(?:\s*cafe)?\b/g, 'panera bread'],
+    [/\bhash\s*browns?\b/g, 'hashbrown'],
+    [/\broast\s*beef\b/g, 'roastbeef'],
+    [/\bbeef\s*n\s*cheddar\b/g, 'beef cheddar'],
+    [/\bcheese\s*burgers?\b/g, 'cheeseburger'],
+    [/\bfoot\s*long\b/g, 'footlong'],
+    [/\btwelve\s*inch(?:es)?\b/g, '12inch'],
+    [/\bsix\s*inch(?:es)?\b/g, '6inch'],
+    [/\b12\s*(?:in|inch|inches)\b/g, '12inch'],
+    [/\b6\s*(?:in|inch|inches)\b/g, '6inch'],
+    [/\bchicken\s*(?:fingers?|strips?)\b/g, 'chicken tender'],
+    [/\bb\s*m\s*t\b/g, 'bmt']
   ];
   replacements.forEach(([pattern, replacement]) => { text = text.replace(pattern, replacement); });
   return text.replace(/\s+/g, ' ').trim();
@@ -352,6 +386,80 @@ function foodSearchTokens(query) {
   return normalizeSearchText(query).split(' ').filter(token => token && !RESTAURANT_SEARCH_STOP_WORDS.has(token));
 }
 
+function searchTokenForms(token) {
+  const value = String(token || '').trim();
+  const forms = new Set([value]);
+  const aliases = {
+    fries:['fry'], fry:['fries'],
+    tenders:['tender'], tender:['tenders'],
+    sandwiches:['sandwich'], sandwich:['sandwiches','sub'], sub:['sandwich'],
+    burgers:['burger'], burger:['burgers'],
+    tacos:['taco'], taco:['tacos'],
+    burritos:['burrito'], burrito:['burritos'],
+    dogs:['dog'], dog:['dogs'],
+    wraps:['wrap'], wrap:['wraps'],
+    biscuits:['biscuit'], biscuit:['biscuits'],
+    sliders:['slider'], slider:['sliders'],
+    mozzarella:['mozz'], mozz:['mozzarella'],
+    breakfast:['morning'], morning:['breakfast'],
+    hashbrown:['hashbrowns'], hashbrowns:['hashbrown'],
+    footlong:['12inch'], '12inch':['footlong'],
+    '6inch':['sixinch'], sixinch:['6inch']
+  };
+  (aliases[value] || []).forEach(alias => forms.add(alias));
+  if (value.length > 4 && value.endsWith('ies')) forms.add(`${value.slice(0, -3)}y`);
+  else if (value.length > 4 && value.endsWith('es')) forms.add(value.slice(0, -2));
+  else if (value.length > 3 && value.endsWith('s')) forms.add(value.slice(0, -1));
+  return [...forms].filter(Boolean);
+}
+
+function boundedDamerauDistance(first, second, limit = 2) {
+  const a = String(first || '');
+  const b = String(second || '');
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  const rows = Array.from({length:a.length + 1}, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i += 1) rows[i][0] = i;
+  for (let j = 0; j <= b.length; j += 1) rows[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    let rowMin = limit + 1;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      rows[i][j] = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        rows[i][j] = Math.min(rows[i][j], rows[i - 2][j - 2] + 1);
+      }
+      rowMin = Math.min(rowMin, rows[i][j]);
+    }
+    if (rowMin > limit) return limit + 1;
+  }
+  return rows[a.length][b.length];
+}
+
+function tokenSimilarity(queryToken, candidateToken) {
+  const queryForms = searchTokenForms(queryToken);
+  const candidateForms = searchTokenForms(candidateToken);
+  let best = 0;
+  queryForms.forEach(query => candidateForms.forEach(candidate => {
+    if (query === candidate) best = Math.max(best, 1);
+    else if (Math.min(query.length, candidate.length) >= 3 && (query.startsWith(candidate) || candidate.startsWith(query))) best = Math.max(best, Math.abs(query.length - candidate.length) <= 3 ? 0.92 : 0.78);
+    else if (Math.min(query.length, candidate.length) >= 4 && (query.includes(candidate) || candidate.includes(query))) best = Math.max(best, 0.76);
+    else {
+      const longest = Math.max(query.length, candidate.length);
+      const limit = longest >= 7 ? 2 : longest >= 4 ? 1 : 0;
+      if (limit) {
+        const distance = boundedDamerauDistance(query, candidate, limit);
+        if (distance <= limit) best = Math.max(best, distance === 1 ? 0.88 : 0.74);
+      }
+    }
+  }));
+  return best;
+}
+
+function bestTokenScore(token, candidates) {
+  return candidates.reduce((best, candidate) => Math.max(best, tokenSimilarity(token, candidate)), 0);
+}
+
 function nutrientAvailable(food, nutrient) {
   return !Array.isArray(food?.availableNutrients) || food.availableNutrients.includes(nutrient);
 }
@@ -359,6 +467,16 @@ function nutrientAvailable(food, nutrient) {
 function restaurantLocationLabel() {
   if (state.profile.country !== 'US') return 'United States menu';
   return state.profile.stateCode ? `United States · ${state.profile.stateCode}` : 'United States';
+}
+
+function restaurantDirectoryMarkup() {
+  const counts = new Map();
+  restaurantFoods().forEach(food => counts.set(food.brand, (counts.get(food.brand) || 0) + 1));
+  const chips = RESTAURANT_QUICK_SEARCHES.map(item => {
+    const count = counts.get(item.label.replace('McDonald’s', "McDonald's").replace('Arby’s', "Arby's")) || counts.get(item.label) || 0;
+    return `<button type="button" data-food-search-query="${escapeHtml(item.query)}"><span>${escapeHtml(item.label)}</span>${count ? `<small>${count}</small>` : ''}</button>`;
+  }).join('');
+  return `<section class="restaurant-directory"><div class="food-result-heading"><strong>Browse restaurant menus</strong><small>${counts.size} chains · ${restaurantFoods().length} items</small></div><div class="restaurant-directory-grid">${chips}</div><p class="food-search-attribution">Search by chain, item, meal, size, or a close spelling. Examples: “Subway turkey footlong,” “Arbys roast beef,” or “Sonic breakfast burrito.”</p></section>`;
 }
 
 function smartRestaurantFit(food) {
@@ -384,14 +502,18 @@ function smartRestaurantFit(food) {
   return {score,label:'Higher-calorie choice',tone:'caution',detail:`Uses a large share of today’s remaining calories relative to its protein.`};
 }
 
+function restaurantBrandMatchScore(queryTokens, food) {
+  const brandTokens = foodSearchTokens(food.brand);
+  if (!brandTokens.length) return 0;
+  const scores = brandTokens.map(brandToken => bestTokenScore(brandToken, queryTokens));
+  if (!scores.length || scores.some(score => score < 0.72)) return 0;
+  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+}
+
 function hasStrongRestaurantIntent(query) {
-  const normalized = normalizeSearchText(query);
-  if (normalized.length < 2) return false;
-  return restaurantFoods().some(food => {
-    const brand = normalizeSearchText(food.brand);
-    const name = normalizeSearchText(food.name);
-    return normalized === name || normalized.includes(brand);
-  });
+  const tokens = foodSearchTokens(query);
+  if (!tokens.length) return false;
+  return restaurantFoods().some(food => restaurantBrandMatchScore(tokens, food) >= 0.82);
 }
 
 function restaurantSearchResults(query) {
@@ -399,44 +521,55 @@ function restaurantSearchResults(query) {
   const tokens = foodSearchTokens(query);
   if (normalized.length < 2 || !tokens.length) return [];
 
-  // A chain/category browse such as “McDonald's breakfast” contains no
-  // item-specific words. In that case, rank by today's plan fit first so the
-  // user sees practical recommendations rather than whichever item happens to
-  // repeat the word “breakfast” in its product name.
-  const genericBrowse = restaurantFoods().some(food => {
-    const brandTokens = foodSearchTokens(food.brand);
-    const categoryTokens = foodSearchTokens(food.category);
-    const browseVocabulary = new Set([...brandTokens, ...categoryTokens]);
-    const identifiesBrand = brandTokens.length > 0 && brandTokens.every(token => tokens.includes(token));
-    const identifiesCategory = categoryTokens.length > 0 && categoryTokens.some(token => tokens.includes(token));
-    return identifiesBrand && identifiesCategory && tokens.every(token => browseVocabulary.has(token));
-  });
-
   return restaurantFoods().map(food => {
-    const fields = [food.name, food.brand, food.category, ...(food.aliases || []), ...(food.tags || [])].map(normalizeSearchText);
-    const haystack = fields.join(' ');
-    if (!tokens.every(token => haystack.includes(token))) return null;
-    let relevance = 0;
     const name = normalizeSearchText(food.name);
     const brand = normalizeSearchText(food.brand);
-    if (name === normalized) relevance += 120;
-    if (name.startsWith(normalized)) relevance += 80;
-    if (brand === normalized) relevance += 70;
-    if (normalized.includes(brand)) relevance += 50;
-    if (normalizeSearchText(food.category) && normalized.includes(normalizeSearchText(food.category))) relevance += 25;
+    const category = normalizeSearchText(food.category);
+    const aliases = (food.aliases || []).map(normalizeSearchText);
+    const tags = (food.tags || []).map(normalizeSearchText);
+    const nameTokens = foodSearchTokens(food.name);
+    const brandTokens = foodSearchTokens(food.brand);
+    const categoryTokens = foodSearchTokens(food.category);
+    const aliasTokens = aliases.flatMap(foodSearchTokens);
+    const tagTokens = tags.flatMap(foodSearchTokens);
+    const allCandidateTokens = [...new Set([...nameTokens, ...brandTokens, ...categoryTokens, ...aliasTokens, ...tagTokens])];
+    const brandScore = restaurantBrandMatchScore(tokens, food);
+    const brandIdentified = brandScore >= 0.82;
+    const itemTokens = brandIdentified ? tokens.filter(token => bestTokenScore(token, brandTokens) < 0.82) : tokens;
+    const tokenScores = itemTokens.map(token => bestTokenScore(token, allCandidateTokens));
+    const averageScore = tokenScores.length ? tokenScores.reduce((sum, score) => sum + score, 0) / tokenScores.length : 1;
+    const weakestScore = tokenScores.length ? Math.min(...tokenScores) : 1;
+    const strongMatches = tokenScores.filter(score => score >= 0.82).length;
+
+    if (brandIdentified) {
+      if (itemTokens.length && (averageScore < 0.66 || weakestScore < 0.52)) return null;
+    } else if (averageScore < 0.76 || strongMatches < Math.max(1, Math.ceil(itemTokens.length * 0.5))) {
+      return null;
+    }
+
+    let relevance = brandIdentified ? 110 * brandScore : 0;
+    if (name === normalized) relevance += 180;
+    if (name.startsWith(normalized)) relevance += 110;
+    if (normalized.includes(name) && name.length >= 4) relevance += 80;
+    if (brand === normalized) relevance += 150;
+    if (normalized.includes(brand) && brand.length >= 4) relevance += 85;
+    if (category && normalized.includes(category)) relevance += 40;
+    tokenScores.forEach(score => { relevance += score * 42; });
     tokens.forEach(token => {
-      if (name.includes(token)) relevance += 20;
-      if (brand.includes(token)) relevance += 14;
-      if ((food.aliases || []).some(alias => normalizeSearchText(alias).includes(token))) relevance += 8;
-      if ((food.tags || []).some(tag => normalizeSearchText(tag).includes(token))) relevance += 4;
+      relevance += bestTokenScore(token, nameTokens) * 28;
+      relevance += bestTokenScore(token, aliasTokens) * 18;
+      relevance += bestTokenScore(token, tagTokens) * 8;
     });
-    return {food,relevance,fit:smartRestaurantFit(food)};
+
+    const genericVocabulary = new Set([...brandTokens, ...categoryTokens, 'breakfast','morning','lunch','dinner','side','sandwich','burger','chicken','menu']);
+    const genericBrowse = brandIdentified && itemTokens.every(token => [...genericVocabulary].some(candidate => tokenSimilarity(token, candidate) >= 0.82));
+    return {food,relevance,fit:smartRestaurantFit(food),genericBrowse,averageScore};
   }).filter(Boolean).sort((first, second) => {
-    if (genericBrowse) {
+    if (first.genericBrowse && second.genericBrowse) {
       return second.fit.score - first.fit.score || first.food.calories - second.food.calories || second.relevance - first.relevance;
     }
-    return second.relevance - first.relevance || second.fit.score - first.fit.score || first.food.calories - second.food.calories;
-  }).map(result => result.food);
+    return second.relevance - first.relevance || second.averageScore - first.averageScore || second.fit.score - first.fit.score || first.food.calories - second.food.calories;
+  }).slice(0, 80).map(result => result.food);
 }
 
 function cacheOnlineFood(food) {
@@ -994,7 +1127,8 @@ function editDiaryFoodModal(entry) {
 }
 
 function foodModal(meal) {
-  return `<div class="modal-form"><label>Meal<select id="foodMeal">${mealOptions(meal)}</select></label><label>Search foods, brands, or restaurants<input id="foodSearch" type="search" maxlength="120" placeholder="McDonald’s breakfast, Egg McMuffin, Doritos…" autocomplete="off" enterkeyhint="search" spellcheck="false"></label><div class="restaurant-quick-search" aria-label="Popular restaurant searches"><button type="button" data-food-search-query="McDonald's breakfast">McDonald’s breakfast</button><button type="button" data-food-search-query="Chick-fil-A breakfast">Chick-fil-A</button><button type="button" data-food-search-query="Starbucks breakfast">Starbucks</button><button type="button" data-food-search-query="Taco Bell">Taco Bell</button></div><p class="form-note food-search-help">Restaurant menu matches appear instantly from the audited U.S. catalog. Packaged-food results are searched online after you pause typing.</p><div class="inline-actions"><button type="button" class="secondary-button" id="createFoodButton">Create custom food</button></div><div id="foodResults" class="search-results" aria-live="polite"></div></div>`;
+  const quickSearches = RESTAURANT_QUICK_SEARCHES.map(item => `<button type="button" data-food-search-query="${escapeHtml(item.query)}">${escapeHtml(item.label)}</button>`).join('');
+  return `<div class="modal-form"><label>Meal<select id="foodMeal">${mealOptions(meal)}</select></label><label>Search foods, brands, or restaurants<input id="foodSearch" type="search" maxlength="120" placeholder="Subway turkey footlong, Arby’s roast beef, Sonic burrito…" autocomplete="off" enterkeyhint="search" spellcheck="false"></label><div class="restaurant-quick-search" aria-label="Popular restaurant searches">${quickSearches}</div><p class="form-note food-search-help">Official U.S. restaurant matches appear instantly. Search tolerates common aliases, missing punctuation, plural forms, and close spelling. Community food results are searched online after you pause typing.</p><div class="inline-actions"><button type="button" class="secondary-button" id="createFoodButton">Create custom food</button></div><div id="foodResults" class="search-results" aria-live="polite"></div></div>`;
 }
 
 function barcodeModal(meal) {
@@ -1053,27 +1187,28 @@ function renderFoodResults(query) {
     : [];
 
   const sections = [];
+  if (!normalizedQuery) sections.push(restaurantDirectoryMarkup());
   if (recentRestaurantFoods.length) {
     sections.push(`<div class="food-result-section restaurant-food-section"><div class="food-result-heading"><strong>Recent restaurant items</strong><small>${escapeHtml(restaurantLocationLabel())}</small></div>${recentRestaurantFoods.map(food => foodSearchResultButton(food, 'restaurant')).join('')}</div>`);
   }
   if (restaurantMatches.length) {
-    sections.push(`<div class="food-result-section restaurant-food-section"><div class="food-result-heading"><strong>Restaurant menus</strong><small>${escapeHtml(restaurantLocationLabel())} · ${restaurantMatches.length} match${restaurantMatches.length === 1 ? '' : 'es'}</small></div><div class="restaurant-search-note">Results use search relevance and today’s remaining calories and protein; broad chain or meal searches place stronger plan-fit choices first. This is planning guidance, not medical advice.</div>${restaurantMatches.slice(0, 40).map(food => foodSearchResultButton(food, 'restaurant')).join('')}<p class="food-search-attribution">Standard U.S. menu nutrition. Availability, recipes, portions, and customizations can vary by restaurant.</p></div>`);
+    sections.push(`<div class="food-result-section restaurant-food-section"><div class="food-result-heading"><strong>Restaurant menus</strong><small>${escapeHtml(restaurantLocationLabel())} · ${restaurantMatches.length} match${restaurantMatches.length === 1 ? '' : 'es'}</small></div><div class="restaurant-search-note">Results use search relevance and today’s remaining calories and protein; broad chain or meal searches place stronger plan-fit choices first. This is planning guidance, not medical advice.</div>${restaurantMatches.slice(0, 80).map(food => foodSearchResultButton(food, 'restaurant')).join('')}<p class="food-search-attribution">Standard U.S. menu nutrition. Availability, recipes, portions, and customizations can vary by restaurant.</p></div>`);
   }
   if (localFoods.length) {
     sections.push(`<div class="food-result-section"><div class="food-result-heading"><strong>${normalizedQuery ? 'Saved and common foods' : 'Recent and common foods'}</strong><small>${localFoods.length} result${localFoods.length === 1 ? '' : 's'}</small></div>${localFoods.slice(0, normalizedQuery ? 12 : 30).map(food => foodSearchResultButton(food)).join('')}</div>`);
   }
   if (normalizedQuery.length >= 2) {
     if (onlineFoodLoading && onlineFoodQuery === String(query || '').trim().toLowerCase()) {
-      sections.push('<div class="food-search-status"><span class="search-spinner" aria-hidden="true"></span><span>Searching packaged foods and brands…</span></div>');
+      sections.push('<div class="food-search-status"><span class="search-spinner" aria-hidden="true"></span><span>Searching the community food database…</span></div>');
     } else if (onlineFoods.length) {
-      sections.push(`<div class="food-result-section online-food-section"><div class="food-result-heading"><strong>Packaged foods</strong><small>Open Food Facts</small></div>${onlineFoods.slice(0, 24).map(food => foodSearchResultButton(food, 'online')).join('')}<p class="food-search-attribution">Nutrition is community-contributed. Compare it with the package label.</p></div>`);
+      sections.push(`<div class="food-result-section online-food-section"><div class="food-result-heading"><strong>Community food matches</strong><small>Open Food Facts</small></div>${onlineFoods.slice(0, 24).map(food => foodSearchResultButton(food, 'online')).join('')}<p class="food-search-attribution">Nutrition is community-contributed. Compare it with the package label.</p></div>`);
     } else if (onlineFoodError && onlineFoodQuery === String(query || '').trim().toLowerCase()) {
       sections.push(`<div class="food-search-status error"><span>${escapeHtml(onlineFoodError)}</span><button type="button" class="text-button" id="retryFoodSearch">Retry</button></div>`);
     } else if (onlineFoodQuery === String(query || '').trim().toLowerCase() && !restaurantMatches.length) {
-      sections.push('<p class="form-note">No restaurant or packaged-food match was found. Try the restaurant plus item name, or create a custom food.</p>');
+      sections.push('<p class="form-note">No restaurant or community-food match was found. Try a shorter chain or item name, check the spelling, or create a custom food.</p>');
     }
   }
-  target.innerHTML = sections.join('') || '<p class="form-note">Search a restaurant, menu item, brand, or saved food. Type at least two letters for online packaged-food search.</p>';
+  target.innerHTML = sections.join('') || '<p class="form-note">Search a restaurant, menu item, brand, or saved food. Browse a chain below or type at least two letters.</p>';
 }
 function productNutrientExists(product, names) {
   const nutrition = product?.nutriments || product?.nutrition || {};
@@ -1147,7 +1282,7 @@ async function runOnlineFoodSearch(query, force = false) {
   const normalized = String(query || '').trim().slice(0, MAX_FOOD_SEARCH_LENGTH).toLowerCase();
   const currentInput = $('#foodSearch');
   if (!currentInput || String(currentInput.value || '').trim().toLowerCase() !== normalized) return;
-  if (normalized.length < 2 || hasStrongRestaurantIntent(query)) {
+  if (normalized.length < 2) {
     onlineFoodResults = [];
     onlineFoodQuery = normalized;
     onlineFoodLoading = false;
@@ -1183,10 +1318,10 @@ function scheduleOnlineFoodSearch(query) {
   const normalized = String(query || '').trim().slice(0, MAX_FOOD_SEARCH_LENGTH);
   onlineFoodResults = [];
   onlineFoodQuery = normalized.toLowerCase();
-  onlineFoodLoading = normalized.length >= 2 && !hasStrongRestaurantIntent(query);
+  onlineFoodLoading = normalized.length >= 2;
   onlineFoodError = '';
   renderFoodResults(query);
-  if (normalized.length < 2 || hasStrongRestaurantIntent(query)) {
+  if (normalized.length < 2) {
     onlineFoodLoading = false;
     renderFoodResults(query);
     return;
@@ -1474,7 +1609,7 @@ function barcodeCameraErrorMessage(error) {
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'The camera is busy or unavailable. Close other camera apps, return to PhactoryFit, and try again.';
   if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The requested rear-camera mode was unavailable. PhactoryFit will retry with simpler camera settings.';
-  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.10.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
+  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.11.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
   if (name === 'TimeoutError') return 'No barcode was detected. Hold the package 6–10 inches away, avoid glare, and keep the entire barcode inside the frame.';
   return 'The barcode camera could not start. Check camera permission, lighting, and the secure HTTPS address, then try again.';
 }

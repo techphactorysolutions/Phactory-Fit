@@ -76,7 +76,7 @@ async def test_cosmic_dashboard_and_all_four_gauges(browser):
       theme:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
       motion:document.documentElement.classList.contains('motion-ready')
     })""")
-    assert result["version"] == "1.10.0", result
+    assert result["version"] == "1.11.0", result
     assert result["slogan"] == "Build better. Fuel smarter. Live stronger.", result
     assert result["studio"] == "Tech Phactory Solutions", result
     assert result["width"][0] == result["width"][1], result

@@ -1,4 +1,4 @@
-# PhactoryFit 1.10.0 Release Validation Plan
+# PhactoryFit 1.11.0 Release Validation Plan
 
 ## Automated
 
@@ -20,35 +20,41 @@ Expected results:
 - 84/84 static checks
 - 6/6 service-worker checks
 - 5/5 browser security checks
-- 4/4 restaurant workflow checks
+- 11/11 restaurant catalog, fuzzy-search, serving, and fallback checks
 - 5/5 UI and diary-editing checks
 - 3/3 iPhone camera lifecycle checks
 - zero npm audit vulnerabilities
 
 ## Manual restaurant validation
 
-1. Open **Log Food**.
-2. Search `McDonald's breakfast`.
-3. Confirm Hash Browns, Egg McMuffin, Sausage McMuffin, biscuits, McGriddles, oatmeal, hotcakes, and breakfast platters appear.
-4. Open Egg McMuffin and verify one serving shows 310 calories, 17 g protein, 30 g carbohydrates, and 13 g fat.
-5. Change servings to 2 and confirm the preview shows 620 calories and 34 g protein.
-6. Add it to Breakfast and verify diary totals.
-7. Search `Chick-fil-A breakfast`, `Starbucks breakfast`, and `Taco Bell`.
-8. Confirm each restaurant item shows a plan-fit badge or a calories-only label.
-9. Open a partial record such as McChicken Biscuit and confirm missing macros display as unavailable rather than 0.
-10. In Settings, enter `MO` as the state and confirm restaurant results show `United States · MO`.
+1. Open **Log Food** and confirm the restaurant directory lists eleven chains and 250 local records.
+2. Search `McDonald's breakfast` and confirm breakfast sandwiches, Hash Browns, oatmeal, hotcakes, and platters are discoverable.
+3. Search `subawy turkey 6 inch` and confirm **6-inch Oven-Roasted Turkey** appears despite the typo.
+4. Search `subway foot long turkey` and confirm footlong turkey choices appear with footlong serving nutrition.
+5. Search `arbys roastbeef` and confirm Classic, Double, and Half Pound Roast Beef results.
+6. Search `sonic breakfast burrito` and confirm bacon and sausage burritos.
+7. Search `fiveguys little cheese burger` and confirm Little Cheeseburger ranks first.
+8. Search `bdubs mozzarella` and confirm Buffalo Wild Wings Mozzarella Sticks.
+9. Search `chipotle high protein bowl` and confirm Double High Protein Bowl appears.
+10. Search `chipotle chicken` and confirm the Chicken component appears with per-serving nutrition.
+11. Search `panera broccoli cheddar cup` and confirm the cup serving appears before bowl and bread-bowl variants.
+12. Search `panera chipotle chicken avo half` and confirm the half sandwich appears.
+13. Open a full nutrition record and change servings to 2; confirm all available totals double.
+14. Open a partial record such as Five Guys Cheeseburger and confirm missing macros display as unavailable, not zero.
+15. Enter `MO` in Settings and confirm restaurant results display `United States · MO`.
+16. Search an unsupported chain while online and confirm the community food database is attempted without replacing official local results.
 
 ## iPhone PWA regression
 
 1. Deploy all package files to GitHub Pages.
 2. Open the site in Safari and refresh twice.
-3. Confirm Settings displays Version 1.10.0.
+3. Confirm Settings displays Version 1.11.0.
 4. Test restaurant search online and offline.
 5. Test rear-camera barcode scanning after allowing permission.
 6. Close and reopen the Home Screen app and verify the restaurant catalog still works offline.
 7. Export a backup, add a restaurant item, import the backup, and confirm previous data is restored.
 
-## v1.10 UI validation additions
+## Cosmic UI validation
 
 1. Confirm the header reads “Designed by Tech Phactory Solutions” and displays the slogan “Build better. Fuel smarter. Live stronger.”
 2. Confirm calories, protein, carbohydrates, and fat each display a circular gauge with correct percentage, consumed amount, goal, and remaining/over amount.
@@ -58,7 +64,7 @@ Expected results:
 6. Confirm the hero “Log your first meal” button opens Add food.
 7. Confirm the rear-camera scanner remains open after permission and still closes its tracks when the scanner is explicitly dismissed.
 
-## v1.10 diary editing validation
+## Diary editing validation
 
 1. Log or scan a food and open **Diary**.
 2. Confirm the entry displays its local logging time and an **Edit** action.

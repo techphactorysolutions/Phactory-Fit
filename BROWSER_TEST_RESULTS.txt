@@ -1,4 +1,4 @@
-PhactoryFit 1.10.0 browser regression summary
+PhactoryFit 1.11.0 browser regression summary
 
 PASS: 5/5 UI and diary-editing tests
 - Cosmic dashboard and all four macro gauges
@@ -8,7 +8,7 @@ PASS: 5/5 UI and diary-editing tests
 - Edit meal period, exact time, serving amount, recalculated totals, persistence, automatic time logging, and deletion
 
 PASS: 5/5 malicious-input browser security tests
-PASS: 4/4 restaurant search and serving tests
+PASS: 11/11 restaurant catalog, fuzzy-search, serving, and fallback tests
 PASS: 3/3 iPhone camera lifecycle tests
 
-TOTAL: 17/17 browser workflow scenarios passed
+TOTAL: 24/24 browser workflow scenarios passed

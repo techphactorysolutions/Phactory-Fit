@@ -1,0 +1,18 @@
+PhactoryFit 1.11.0 Restaurant Data Audit
+Total records: 250
+Unique chains: 11
+Duplicate IDs: 0
+Invalid required/numeric fields: 0
+
+Per-chain counts:
+- Arby's: 30
+- Buffalo Wild Wings: 7
+- Chick-fil-A: 14
+- Chipotle: 25
+- Five Guys: 21
+- McDonald's: 17
+- Panera Bread: 39
+- Sonic Drive-In: 29
+- Starbucks: 3
+- Subway: 56
+- Taco Bell: 9

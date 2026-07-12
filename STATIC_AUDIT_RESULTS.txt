@@ -12,10 +12,10 @@ PASS: required file: THREAT_MODEL.md
 PASS: required file: VENDOR_LOCK.json
 PASS: required file: package.json
 PASS: required file: package-lock.json
-PASS: version 1.10.0 in index.html
-PASS: version 1.10.0 in app.js
-PASS: version 1.10.0 in service-worker.js
-PASS: version 1.10.0 in package.json
+PASS: version 1.11.0 in index.html
+PASS: version 1.11.0 in app.js
+PASS: version 1.11.0 in service-worker.js
+PASS: version 1.11.0 in package.json
 PASS: manifest start_url is relative
 PASS: manifest scope is relative
 PASS: manifest standalone display

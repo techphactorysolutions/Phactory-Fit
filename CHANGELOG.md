@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.11.0 — July 12, 2026
+
+### Restaurant catalog expansion
+- Expanded the first-party offline U.S. restaurant catalog from 43 to 250 records and from 4 to 11 chains.
+- Added Subway, Arby's, Sonic Drive-In, Five Guys, Buffalo Wild Wings, Chipotle, and Panera Bread.
+- Added 6-inch and footlong Subway products with size-specific nutrition and aliases.
+- Added Chipotle ingredients/components plus the Double High Protein Bowl so custom meals can be assembled without relying on one generic bowl.
+- Added Panera breakfast, half/whole sandwiches, soups, salads, and mac & cheese with serving-specific records.
+- Added official per-serving nutrition where available; incomplete official records remain explicitly partial.
+- Added a browseable restaurant directory with chain item counts.
+
+### Search accuracy
+- Replaced strict all-token substring matching with weighted relevance and bounded fuzzy matching.
+- Added Damerau edit-distance handling for common typos and transposed letters.
+- Added chain aliases including McD, CFA, B-Dubs, BWW, FiveGuys, T-Bell, Panera, and Chipotle Mexican Grill.
+- Added phrase normalization for footlong, 6-inch, 12-inch, hash browns, roast beef, cheeseburger, chicken tenders, and common chain names.
+- Added singular/plural and common menu-term equivalence.
+- Preserved plan-fit ordering for broad chain/category browsing while exact item searches prioritize name relevance.
+- Restaurant searches now also run the optional Open Food Facts fallback for additional community matches.
+
+### Validation
+- Added 11 restaurant search tests covering catalog size, aliases, typos, sizes, chain discovery, Chipotle components, Panera serving variants, partial nutrition, online fallback, and diary logging.
+- Verified all 250 catalog entries have unique IDs, valid required fields, and nonnegative nutrition values.
+- Updated service-worker cache, versioned assets, package metadata, public documentation, and release tests to 1.11.0.
+
 ## v1.10.0 — July 12, 2026
 
 ### Editable food diary entries
@@ -16,7 +41,7 @@
 - Added secure validation for meal period, time, serving amount, and entry identifiers.
 - Added mobile-sized Edit and Delete controls that match the cosmic visual system.
 - Added automated browser coverage for edit, move, time, portion, totals, persistence, and deletion workflows.
-- Updated the PWA cache and asset versions to 1.10.0.
+- Updated the PWA cache and asset versions to 1.11.0.
 
 ## v1.9.0 — July 12, 2026
 

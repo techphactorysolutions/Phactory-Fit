@@ -1,1 +1,3 @@
-PASS: app.js, restaurant-foods.js, and service-worker.js syntax valid
+PASS app.js
+PASS restaurant-foods.js
+PASS service-worker.js
