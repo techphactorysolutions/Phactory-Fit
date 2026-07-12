@@ -1,4 +1,4 @@
-# PhactoryFit 1.8.0 Release Validation Plan
+# PhactoryFit 1.9.0 Release Validation Plan
 
 ## Automated
 
@@ -38,8 +38,18 @@ Expected results:
 
 1. Deploy all package files to GitHub Pages.
 2. Open the site in Safari and refresh twice.
-3. Confirm Settings displays Version 1.8.0.
+3. Confirm Settings displays Version 1.9.0.
 4. Test restaurant search online and offline.
 5. Test rear-camera barcode scanning after allowing permission.
 6. Close and reopen the Home Screen app and verify the restaurant catalog still works offline.
 7. Export a backup, add a restaurant item, import the backup, and confirm previous data is restored.
+
+## v1.9 UI validation additions
+
+1. Confirm the header reads “Designed by Tech Phactory Solutions” and displays the slogan “Build better. Fuel smarter. Live stronger.”
+2. Confirm calories, protein, carbohydrates, and fat each display a circular gauge with correct percentage, consumed amount, goal, and remaining/over amount.
+3. Scroll the Today view and verify cards reveal smoothly without flicker or horizontal movement.
+4. Enable iOS Reduce Motion and confirm all information appears immediately with no moving starfield or reveal delay.
+5. Test Today, Diary, Log, Progress, Coach, and Settings at iPhone and iPad widths.
+6. Confirm the hero “Log your first meal” button opens Add food.
+7. Confirm the rear-camera scanner remains open after permission and still closes its tracks when the scanner is explicitly dismissed.

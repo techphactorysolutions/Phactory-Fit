@@ -2,13 +2,13 @@
   "id": "./",
   "name": "PhactoryFit",
   "short_name": "PhactoryFit",
-  "description": "Private, adaptive nutrition and fitness tracking by Tech Phactory Solutions LLC.",
+  "description": "Private, adaptive nutrition and fitness tracking by Tech Phactory Solutions.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#f4f6f8",
-  "theme_color": "#111827",
+  "background_color": "#020817",
+  "theme_color": "#020817",
   "icons": [
     {
       "src": "icon-192.png",

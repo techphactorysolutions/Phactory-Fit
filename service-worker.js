@@ -1,16 +1,16 @@
 'use strict';
 
-const CACHE = 'phactoryfit-v1.8.0';
+const CACHE = 'phactoryfit-v1.9.0';
 const SCOPE_URL = new URL(self.registration.scope);
 const OFFLINE_PAGE = new URL('./index.html', SCOPE_URL).href;
 const CORE_SHELL = [
   './',
   './index.html',
-  './styles.css?v=1.8.0',
-  './config.js?v=1.8.0',
-  './restaurant-foods.js?v=1.8.0',
-  './zxing-browser.min.js?v=1.8.0',
-  './app.js?v=1.8.0',
+  './styles.css?v=1.9.0',
+  './config.js?v=1.9.0',
+  './restaurant-foods.js?v=1.9.0',
+  './zxing-browser.min.js?v=1.9.0',
+  './app.js?v=1.9.0',
   './manifest.webmanifest'
 ];
 const OPTIONAL_SHELL = [
@@ -61,7 +61,7 @@ function canCache(request, response) {
 
 function canonicalCacheKey(request) {
   const url = new URL(request.url);
-  if (/\.(?:js|css)$/.test(url.pathname)) url.search = '?v=1.8.0';
+  if (/\.(?:js|css)$/.test(url.pathname)) url.search = '?v=1.9.0';
   else url.search = '';
   url.hash = '';
   return url.href;

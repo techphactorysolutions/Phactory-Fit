@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.9.0 — July 12, 2026
+
+### Complete visual overhaul
+- Rebuilt the application around an original cosmic performance design with a dark animated starfield, nebula lighting, and layered navy glass surfaces.
+- Replaced the old header with a “Designed by Tech Phactory Solutions” brand lockup.
+- Added the slogan **Build better. Fuel smarter. Live stronger.**
+- Rebuilt the daily-readiness hero, macro cards, healthy-habits panel, coach insight card, and bottom navigation.
+- Added distinct neon visual identities for calories, protein, carbohydrates, fat, water, steps, workouts, and sleep.
+
+### Macro gauges and calculation presentation
+- Added circular gauges for calories, protein, carbohydrates, and fat.
+- Added percentage, remaining, consumed, goal, and plan-status text to all four macro panels.
+- Preserved accurate over-goal messaging rather than clipping or presenting negative remaining values.
+- Added accessible gauge labels and maintained the existing hidden linear-progress state for compatibility.
+
+### Motion and mobile performance
+- Added view-entry and IntersectionObserver-based scroll-reveal animations.
+- Added an animated CSS-only background with no remote media dependency.
+- Added `prefers-reduced-motion` handling that removes all decorative movement and reveal delays.
+- Reduced expensive blur/filter use to protect iPhone Safari performance.
+- Added responsive iPhone, narrow-screen, and iPad layouts with zero horizontal overflow in regression tests.
+
+### Compatibility and quality
+- Preserved v1.8 restaurant search, Open Food Facts search, barcode scanning, diary, progress, coaching, backups, security controls, and local storage schema.
+- Updated manifest colors, service-worker cache keys, versioned assets, package metadata, and public documentation.
+- Added four UI regression tests and three iPhone camera lifecycle regression checks.
+- Confirmed 84/84 static/security checks, 6/6 service-worker checks, 5/5 browser-security checks, 4/4 restaurant checks, 4/4 UI checks, and 3/3 camera checks.
+
 ## v1.8.0 — July 12, 2026
 
 ### Restaurant search

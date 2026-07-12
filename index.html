@@ -5,71 +5,103 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://images.openfoodfacts.org; connect-src 'self' https://world.openfoodfacts.org; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; form-action 'self'; frame-src 'none'; upgrade-insecure-requests; block-all-mixed-content">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#111827">
+  <meta name="theme-color" content="#020817">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PhactoryFit">
   <meta name="description" content="PhactoryFit — private, adaptive nutrition and fitness tracking.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=1.8.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=1.9.0">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="apple-touch-icon-precomposed" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css?v=1.8.0">
+  <link rel="stylesheet" href="styles.css?v=1.9.0">
   <title>PhactoryFit</title>
 </head>
 <body>
   <div class="app-shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">TECH PHACTORY SOLUTIONS LLC</p>
-        <h1>PhactoryFit</h1>
+    <header class="topbar reveal-item">
+      <div class="brand-lockup">
+        <p class="designed-by">Designed by</p>
+        <p class="brand-studio">Tech Phactory Solutions</p>
+        <h1><span>Phactory</span><em>Fit</em></h1>
+        <p class="brand-slogan">Build better. Fuel smarter. Live stronger.</p>
       </div>
-      <button type="button" id="dateButton" class="date-chip" aria-label="Choose date"></button>
+      <button type="button" id="dateButton" class="date-chip" aria-label="Choose date"><span aria-hidden="true">▣</span></button>
     </header>
 
     <main id="app" tabindex="-1">
       <section class="view active" data-view="today">
-        <div class="hero-card">
-          <div>
-            <p class="muted">Daily readiness</p>
-            <h2 id="greeting">Good evening, Sean</h2>
+        <section class="hero-card reveal-item">
+          <div class="hero-content">
+            <p class="hero-label">Daily readiness</p>
+            <h2 id="greeting">Good evening, Athlete</h2>
             <p id="coachHeadline" class="hero-copy"></p>
+            <button type="button" class="hero-action" id="heroLogButton">Log your first meal <span aria-hidden="true">›</span></button>
           </div>
-          <div class="score-ring" id="scoreRing" role="img" aria-label="Daily score: 0 percent">
-            <span id="dailyScore">0</span><small>%</small>
-          </div>
-        </div>
-
-        <div class="macro-grid">
-          <article class="metric-card calories">
-            <div class="metric-head"><span>Calories</span><strong id="caloriesRemaining">0</strong></div>
-            <p><span id="caloriesConsumed">0</span> of <span id="calorieGoal">0</span> kcal</p>
-            <div class="progress"><span id="calorieBar"></span></div>
-          </article>
-          <article class="metric-card protein">
-            <div class="metric-head"><span>Protein floor</span><strong id="proteinRemaining">0g</strong></div>
-            <p><span id="proteinConsumed">0</span> of <span id="proteinGoal">0</span> g</p>
-            <div class="progress"><span id="proteinBar"></span></div>
-          </article>
-          <article class="metric-card"><div class="metric-head"><span>Carbs</span><strong id="carbConsumed">0g</strong></div><p id="carbGoalText">Goal 0 g</p></article>
-          <article class="metric-card"><div class="metric-head"><span>Fat</span><strong id="fatConsumed">0g</strong></div><p id="fatGoalText">Goal 0 g</p></article>
-        </div>
-
-        <section class="section-card">
-          <div class="section-title"><div><p class="muted">Today</p><h3>Healthy habits</h3></div><button type="button" class="text-button" data-nav="diary">Open diary</button></div>
-          <div class="habit-grid">
-            <button type="button" class="habit" id="waterHabit"><span>💧</span><strong id="waterValue">0</strong><small>cups</small></button>
-            <button type="button" class="habit" id="stepsHabit"><span>👟</span><strong id="stepsValue">0</strong><small>steps</small></button>
-            <button type="button" class="habit" id="workoutHabit"><span>🏋️</span><strong id="workoutValue">0</strong><small>minutes</small></button>
-            <button type="button" class="habit" id="sleepHabit"><span>🌙</span><strong id="sleepValue">0</strong><small>hours</small></button>
+          <div class="score-cluster">
+            <div class="score-ring" id="scoreRing" role="img" aria-label="Daily score: 0 percent">
+              <span id="dailyScore">0</span><small>%</small>
+            </div>
+            <span class="score-caption">Daily Progress</span>
           </div>
         </section>
 
-        <section class="section-card">
-          <div class="section-title"><div><p class="muted">Coach insight</p><h3 id="insightTitle">Build your first day</h3></div><span class="badge">Transparent</span></div>
-          <p id="insightBody" class="body-copy"></p>
-          <div id="coachActions" class="chip-row"></div>
+        <div class="macro-grid" aria-label="Daily nutrition summary">
+          <article class="metric-card calories reveal-item">
+            <div class="metric-gauge" id="calorieGauge" role="img" aria-label="Calories: 0 percent of goal"><span class="metric-icon" aria-hidden="true">🔥</span></div>
+            <div class="metric-copy">
+              <span class="metric-label">Calories</span>
+              <strong id="caloriesRemaining">0 left</strong>
+              <p><span id="caloriesConsumed">0</span> of <span id="calorieGoal">0</span> kcal</p>
+              <div class="metric-footer"><b id="caloriePercent">0%</b><span id="calorieStatus" class="status-pill">On track</span></div>
+              <div class="progress" aria-hidden="true"><span id="calorieBar"></span></div>
+            </div>
+          </article>
+          <article class="metric-card protein reveal-item">
+            <div class="metric-gauge" id="proteinGauge" role="img" aria-label="Protein: 0 percent of goal"><span class="metric-icon" aria-hidden="true">🏋️</span></div>
+            <div class="metric-copy">
+              <span class="metric-label">Protein</span>
+              <strong id="proteinRemaining">0g left</strong>
+              <p><span id="proteinConsumed">0</span> of <span id="proteinGoal">0</span> g</p>
+              <div class="metric-footer"><b id="proteinPercent">0%</b><span id="proteinStatus" class="status-pill">On track</span></div>
+              <div class="progress" aria-hidden="true"><span id="proteinBar"></span></div>
+            </div>
+          </article>
+          <article class="metric-card carbs reveal-item">
+            <div class="metric-gauge" id="carbGauge" role="img" aria-label="Carbohydrates: 0 percent of goal"><span class="metric-icon" aria-hidden="true">🌿</span></div>
+            <div class="metric-copy">
+              <span class="metric-label">Carbs</span>
+              <strong id="carbRemaining">0g left</strong>
+              <p id="carbGoalText"><span id="carbConsumed">0</span> of <span id="carbGoalValue">0</span> g</p>
+              <div class="metric-footer"><b id="carbPercent">0%</b><span id="carbStatus" class="status-pill">On track</span></div>
+            </div>
+          </article>
+          <article class="metric-card fat reveal-item">
+            <div class="metric-gauge" id="fatGauge" role="img" aria-label="Fat: 0 percent of goal"><span class="metric-icon" aria-hidden="true">💧</span></div>
+            <div class="metric-copy">
+              <span class="metric-label">Fat</span>
+              <strong id="fatRemaining">0g left</strong>
+              <p id="fatGoalText"><span id="fatConsumed">0</span> of <span id="fatGoalValue">0</span> g</p>
+              <div class="metric-footer"><b id="fatPercent">0%</b><span id="fatStatus" class="status-pill">On track</span></div>
+            </div>
+          </article>
+        </div>
+
+        <section class="section-card habits-card reveal-item">
+          <div class="section-title"><div><p class="muted">Today</p><h3><span class="section-icon" aria-hidden="true">♡</span> Healthy habits</h3></div><button type="button" class="text-button" data-nav="diary">Open diary <span aria-hidden="true">›</span></button></div>
+          <div class="habit-grid">
+            <button type="button" class="habit water" id="waterHabit"><span>💧</span><strong id="waterValue">0</strong><small>cups</small><i aria-hidden="true"></i></button>
+            <button type="button" class="habit steps" id="stepsHabit"><span>👟</span><strong id="stepsValue">0</strong><small>steps</small><i aria-hidden="true"></i></button>
+            <button type="button" class="habit workout" id="workoutHabit"><span>🏋️</span><strong id="workoutValue">0</strong><small>minutes</small><i aria-hidden="true"></i></button>
+            <button type="button" class="habit sleep" id="sleepHabit"><span>🌙</span><strong id="sleepValue">0</strong><small>hours</small><i aria-hidden="true"></i></button>
+          </div>
+        </section>
+
+        <section class="section-card insight-card reveal-item">
+          <div class="insight-icon" aria-hidden="true">◉</div>
+          <div class="insight-copy"><p class="muted">Coach insight</p><h3 id="insightTitle">Build your first day</h3><p id="insightBody" class="body-copy"></p><div id="coachActions" class="chip-row"></div></div>
+          <span class="badge">Transparent</span>
         </section>
       </section>
 
@@ -145,17 +177,17 @@
           <details class="privacy-details"><summary>What leaves this device?</summary><p>Camera frames and barcode photos are processed locally and are not uploaded. When you search packaged foods or scan an unknown barcode, the search text or barcode number is sent to Open Food Facts to retrieve nutrition data. Voice search is provided by Safari and may use Apple's online speech-processing service.</p><p>For strongest privacy on GitHub Pages, deploy PhactoryFit on a dedicated custom domain so its browser storage is isolated from other projects on the same <code>github.io</code> origin. See <a href="PRIVACY.md" target="_blank" rel="noopener noreferrer">PRIVACY.md</a> and <a href="SECURITY.md" target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</p></details>
           <div class="button-stack"><button type="button" id="exportButton" class="secondary-button">Export backup</button><label class="secondary-button file-label">Import backup<input id="importInput" type="file" accept="application/json,.json"></label><button type="button" id="resetButton" class="danger-button">Reset local data</button></div>
         </section>
-        <p class="branding">Designed by Tech Phactory Solutions LLC<br><span>Version 1.8.0 · U.S. restaurant catalog + optional Open Food Facts data (ODbL)</span></p>
+        <p class="branding">Designed by Tech Phactory Solutions<br><span>Version 1.9.0 · Cosmic UI · U.S. restaurant catalog + optional Open Food Facts data (ODbL)</span></p>
       </section>
     </main>
 
     <nav class="bottom-nav" aria-label="Primary navigation">
-      <button type="button" class="active" data-view-target="today"><span>⌂</span><small>Today</small></button>
-      <button type="button" data-view-target="diary"><span>☷</span><small>Diary</small></button>
-      <button type="button" class="log-button" data-view-target="log"><span>＋</span><small>Log</small></button>
-      <button type="button" data-view-target="progress"><span>↗</span><small>Progress</small></button>
-      <button type="button" data-view-target="coach"><span>✦</span><small>Coach</small></button>
-      <button type="button" data-view-target="settings"><span>⚙</span><small>Settings</small></button>
+      <button type="button" class="active" data-view-target="today"><span aria-hidden="true">⌂</span><small>Today</small></button>
+      <button type="button" data-view-target="diary"><span aria-hidden="true">▤</span><small>Diary</small></button>
+      <button type="button" class="log-button" data-view-target="log"><span aria-hidden="true">＋</span><small>Log</small></button>
+      <button type="button" data-view-target="progress"><span aria-hidden="true">▥</span><small>Progress</small></button>
+      <button type="button" data-view-target="coach"><span aria-hidden="true">✦</span><small>Coach</small></button>
+      <button type="button" data-view-target="settings"><span aria-hidden="true">⚙</span><small>Settings</small></button>
     </nav>
   </div>
 
@@ -167,10 +199,10 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="config.js?v=1.8.0" defer></script>
-  <script src="restaurant-foods.js?v=1.8.0" defer></script>
+  <script src="config.js?v=1.9.0" defer></script>
+  <script src="restaurant-foods.js?v=1.9.0" defer></script>
   <!-- Exact vendored @zxing/browser 0.2.1. See VENDOR_LOCK.json and ZXING_LICENSE.txt. -->
-  <script src="zxing-browser.min.js?v=1.8.0" defer></script>
-  <script src="app.js?v=1.8.0" defer></script>
+  <script src="zxing-browser.min.js?v=1.9.0" defer></script>
+  <script src="app.js?v=1.9.0" defer></script>
 </body>
 </html>

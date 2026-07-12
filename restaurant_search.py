@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from playwright.async_api import async_playwright
 from browser_security import INLINE_HTML
 
+
+CHROMIUM_EXECUTABLE = "/usr/bin/chromium" if Path("/usr/bin/chromium").exists() else None
 
 async def new_page(browser):
     context = await browser.new_context(
@@ -113,11 +116,13 @@ async def main():
         test_location_label_and_normalized_alias_search,
     ]
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(
-            headless=True,
-            executable_path="/usr/bin/chromium",
-            args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required"],
-        )
+        launch_options = {
+            "headless": True,
+            "args": ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"],
+        }
+        if CHROMIUM_EXECUTABLE:
+            launch_options["executable_path"] = CHROMIUM_EXECUTABLE
+        browser = await playwright.chromium.launch(**launch_options)
         passed = 0
         for test in tests:
             await test(browser)

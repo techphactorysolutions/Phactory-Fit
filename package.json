@@ -1,14 +1,16 @@
 {
   "name": "phactoryfit",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
-  "description": "Security metadata and repeatable checks for the PhactoryFit static PWA with curated U.S. restaurant search.",
+  "description": "Security metadata and repeatable checks for the PhactoryFit cosmic glass UI, local-first fitness tracking, and curated U.S. restaurant search.",
   "scripts": {
     "test:static": "python3 tests/security_static.py",
-    "audit:security": "npm run test:static && npm run test:service-worker && npm run test:browser-security && npm run test:restaurant && node --check app.js && node --check restaurant-foods.js && node --check service-worker.js && npm audit --omit=dev --audit-level=high",
+    "audit:security": "npm run test:static && npm run test:service-worker && npm run test:browser-security && npm run test:restaurant && npm run test:ui && npm run test:camera && node --check app.js && node --check restaurant-foods.js && node --check service-worker.js && npm audit --omit=dev --audit-level=high",
     "test:service-worker": "node tests/service_worker_security.js",
     "test:restaurant": "python3 tests/restaurant_search.py",
-    "test:browser-security": "python3 tests/browser_security.py"
+    "test:browser-security": "python3 tests/browser_security.py",
+    "test:ui": "python3 tests/ui_regression.py",
+    "test:camera": "python3 tests/camera_regression.py"
   },
   "dependencies": {
     "@zxing/browser": "0.2.1",

@@ -1,0 +1,4 @@
+PASS HTML parser accepted index.html
+PASS unique IDs: 70 IDs checked
+PASS all four macro gauges present
+PASS branding and slogan present

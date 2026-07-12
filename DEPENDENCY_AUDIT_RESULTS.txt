@@ -1,7 +1,2 @@
-npm audit --omit=dev
-Critical: 0
-High: 0
-Moderate: 0
-Low: 0
-Info: 0
-Total: 0
+npm audit --omit=dev --audit-level=high
+{"critical": 0, "high": 0, "info": 0, "low": 0, "moderate": 0, "total": 0}

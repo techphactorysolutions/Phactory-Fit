@@ -1,0 +1,4 @@
+PASS iPhone permission transition keeps camera stream open
+PASS pagehide does not terminate an approved camera stream
+PASS closing the scanner stops camera tracks
+PASSED 3/3 camera lifecycle checks

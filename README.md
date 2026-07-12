@@ -1,79 +1,71 @@
-# PhactoryFit 1.8.0
+# PhactoryFit 1.9.0
 
-PhactoryFit is a local-first, installable fitness and nutrition Progressive Web App designed by Tech Phactory Solutions LLC. It supports daily food and macro tracking, barcode scanning, packaged-food search, workouts, habits, weight trends, backups, and explainable coaching without requiring an account.
+**Build better. Fuel smarter. Live stronger.**
 
-## New in 1.8.0: restaurant discovery
+PhactoryFit is an installable, local-first fitness and nutrition Progressive Web App designed by Tech Phactory Solutions. It combines daily calorie and macro tracking, branded-food and restaurant search, barcode scanning, workouts, habits, weight trends, backups, and explainable coaching without requiring an account.
 
-Version 1.8.0 adds a curated U.S. restaurant-menu catalog so common chain items do not depend on a grocery-product database.
+## New in 1.9.0 — Cosmic UI overhaul
 
-- 43 searchable menu records across McDonald's, Chick-fil-A, Starbucks, and Taco Bell
-- McDonald's breakfast coverage including Hash Browns, Egg McMuffin, McGriddles, biscuits, burrito, oatmeal, hotcakes, bagel, and breakfast platters
-- Search normalization for punctuation and aliases such as `McDonald's`, `McDonalds`, `mcd`, and `mickey ds`
-- Restaurant + meal searches such as `McDonald's breakfast`
-- Per-serving Nutrition Facts and adjustable serving quantities
-- Transparent handling of partial nutrition records: unavailable macros display as a dash and are identified before logging
-- “Strong fit,” “Good fit,” “Fits with planning,” and “Higher-calorie choice” guidance based on the user's remaining calories and protein
-- Smarter alternatives from the same restaurant and menu category
-- Optional state code used only to label U.S. menu results; no GPS permission or location service
-- Restaurant catalog is bundled locally and available offline
+- Complete dark cosmic visual system based on the supplied design direction
+- Animated local-only starfield and nebula background
+- Layered navy glass cards with neon teal, blue, purple, orange, and gold accents
+- New PhactoryFit brand lockup and slogan
+- Circular gauges for calories, protein, carbohydrates, and fat
+- Accurate remaining, consumed, goal, and percentage values on every macro card
+- Rebuilt daily-readiness card, healthy-habits panel, coach insight, and bottom navigation
+- Smooth view transitions and scroll-reveal choreography
+- Reduced-motion support for users who disable animation
+- Responsive iPhone and iPad layouts with no horizontal overflow
+- Performance-conscious effects: no remote visual assets and reduced filter load on mobile
 
-The recommendation score is planning guidance. It does not evaluate allergies, medical conditions, every customization, price, or individual dietary restrictions.
+All existing restaurant search, barcode scanning, nutrition calculations, security controls, offline behavior, and locally stored user data remain compatible.
 
 ## Core features
 
 - Daily calories, protein, carbohydrates, fat, fiber, sugar, and sodium
 - Meal-based diary with fractional and multiple servings
-- Custom foods and saved products
-- Brand and packaged-food search through optional Open Food Facts lookups
+- Custom foods and locally remembered products
+- Branded packaged-food search through optional Open Food Facts lookups
+- Curated U.S. restaurant search for McDonald's, Chick-fil-A, Starbucks, and Taco Bell
+- Explainable smarter eating-out suggestions based on remaining calories and protein
 - Rear-camera UPC/EAN scanning and barcode-photo fallback
-- Local barcode memory
-- Workouts, water, steps, sleep, and weigh-ins
-- Weight trends and consistency scoring
-- Adaptive calorie guidance
-- JSON export/import
-- Offline PWA installation
-- Local-first storage with no account, analytics SDK, or advertising SDK
+- Workouts, water, steps, sleep, weigh-ins, and weight trends
+- Adaptive calorie guidance and consistency scoring
+- JSON backup and restore
+- Installable offline PWA
+- No account, analytics SDK, advertising SDK, or private API key
 
-## Deployment
+## GitHub Pages deployment
 
-1. Upload every file in this package to the repository root, including `.github`.
-2. Keep `.nojekyll` in the root.
-3. Enable GitHub Pages from the production branch.
-4. Enforce HTTPS.
-5. Wait for deployment to complete.
-6. Open the Pages URL in Safari and refresh twice.
-7. Fully close and reopen the installed Home Screen app.
-8. Confirm **Settings → Version 1.8.0**.
+1. Export a backup from the current app before replacing production files.
+2. Upload every file and folder from this package to the repository root, including `.github`, `tests`, and `.nojekyll`.
+3. Allow GitHub Pages to finish deploying.
+4. Keep **Enforce HTTPS** enabled.
+5. Open the Pages URL directly in Safari and refresh twice.
+6. Fully close and reopen the Home Screen app.
+7. Confirm **Settings → Version 1.9.0**.
 
-Existing 1.7.0 local data is normalized automatically. Export a backup before replacing a production deployment.
+The service worker uses a new `phactoryfit-v1.9.0` cache, so the older visual bundle is removed during activation.
 
-## Testing
+## Repeatable tests
 
 ```bash
 npm run test:static
 npm run test:service-worker
 npm run test:browser-security
 npm run test:restaurant
+npm run test:ui
+npm run test:camera
 npm audit --omit=dev --audit-level=high
 node --check app.js
 node --check restaurant-foods.js
 node --check service-worker.js
 ```
 
-Playwright and Chromium are required for the browser tests. The production app itself has no Node.js runtime requirement.
+Playwright and Chromium are required only for the repository test suite. The deployed application has no Node.js runtime requirement.
 
-## Data accuracy
+## Data accuracy and privacy
 
-Restaurant records are based on standard U.S. nutrition published by the named restaurants and include a verification date. Restaurant availability, formulation, portion size, and customizations can change. Packaged-food data from Open Food Facts is community-contributed. Users should confirm critical nutrition and allergen information with the restaurant or package label.
+Restaurant records represent standard U.S. menu nutrition and are not live store inventory. Menu availability, preparation, serving size, and customizations can change. Open Food Facts records are community-contributed. Users should verify critical nutrition and allergen information against the restaurant or package label.
 
-## Security and privacy
-
-See:
-
-- `SECURITY.md`
-- `PRIVACY.md`
-- `THREAT_MODEL.md`
-- `AUDIT_REPORT.md`
-- `RESTAURANT_DATA_SOURCES.md`
-
-Do not add private API keys to this repository. Any future accounts, cloud synchronization, health-platform integration, body-photo storage, payments, or AI backend require a new threat model and security audit.
+Diary data stays in the browser unless exported. Camera frames and barcode photos are processed locally. See `PRIVACY.md`, `SECURITY.md`, `THREAT_MODEL.md`, and `AUDIT_REPORT.md` for the complete public-release boundaries.

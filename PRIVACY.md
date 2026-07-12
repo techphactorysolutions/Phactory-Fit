@@ -1,6 +1,6 @@
 # PhactoryFit Privacy Notice
 
-**Version:** 1.8.0  
+**Version:** 1.9.0  
 **Operator:** Tech Phactory Solutions LLC
 
 ## Data stored on the device
@@ -49,12 +49,12 @@ Exported backup files contain the user's fitness and nutrition data in readable 
 
 ## Data minimization
 
-PhactoryFit 1.8.0 does not collect email addresses, passwords, payment details, precise location, contacts, body photographs, government identifiers, or medical records. Features that add cloud storage, wearable health data, photos, or accounts require an updated privacy notice and security review before release.
+PhactoryFit 1.9.0 does not collect email addresses, passwords, payment details, precise location, contacts, body photographs, government identifiers, or medical records. Features that add cloud storage, wearable health data, photos, or accounts require an updated privacy notice and security review before release.
 
 ## Health information
 
 PhactoryFit provides general fitness and nutrition tracking. It is not a medical device and does not provide diagnosis, treatment, or emergency guidance. Users should verify community-supplied nutrition data against product packaging when accuracy matters.
 
-## Restaurant location setting in 1.8.0
+## Restaurant location setting in 1.9.0
 
 The optional two-letter state setting is stored locally with the rest of the profile. It is used only to label U.S. restaurant results. PhactoryFit does not request GPS access, transmit the state setting to a restaurant service, or determine a user's precise location. The bundled restaurant catalog is read locally from the app files.

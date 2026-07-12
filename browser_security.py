@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlparse
 from playwright.async_api import async_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
+CHROMIUM_EXECUTABLE = "/usr/bin/chromium" if Path("/usr/bin/chromium").exists() else None
 
 MALICIOUS_PRODUCT = {
     "count": 1,
@@ -63,11 +64,11 @@ def build_inline_html() -> str:
     """
     html = re.sub(r'\s*<meta http-equiv="Content-Security-Policy"[^>]+>', '', html, count=1)
     html = html.replace('</head>', storage_shim + '</head>')
-    html = html.replace('<link rel="stylesheet" href="styles.css?v=1.8.0">', '<style>' + css + '</style>')
-    html = html.replace('<script src="config.js?v=1.8.0" defer></script>', '<script>' + config + '</script>')
-    html = html.replace('<script src="restaurant-foods.js?v=1.8.0" defer></script>', '<script>' + restaurant_foods + '</script>')
-    html = html.replace('<script src="zxing-browser.min.js?v=1.8.0" defer></script>', '<script>' + zxing + '</script>')
-    html = html.replace('<script src="app.js?v=1.8.0" defer></script>', '<script>' + app + '</script>')
+    html = html.replace('<link rel="stylesheet" href="styles.css?v=1.9.0">', '<style>' + css + '</style>')
+    html = html.replace('<script src="config.js?v=1.9.0" defer></script>', '<script>' + config + '</script>')
+    html = html.replace('<script src="restaurant-foods.js?v=1.9.0" defer></script>', '<script>' + restaurant_foods + '</script>')
+    html = html.replace('<script src="zxing-browser.min.js?v=1.9.0" defer></script>', '<script>' + zxing + '</script>')
+    html = html.replace('<script src="app.js?v=1.9.0" defer></script>', '<script>' + app + '</script>')
     return html
 
 
@@ -239,11 +240,13 @@ async def main():
         test_frame_guard,
     ]
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(
-            headless=True,
-            executable_path="/usr/bin/chromium",
-            args=["--no-sandbox", "--autoplay-policy=no-user-gesture-required"],
-        )
+        launch_options = {
+            "headless": True,
+            "args": ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"],
+        }
+        if CHROMIUM_EXECUTABLE:
+            launch_options["executable_path"] = CHROMIUM_EXECUTABLE
+        browser = await playwright.chromium.launch(**launch_options)
         passed = 0
         for test in tests:
             try:

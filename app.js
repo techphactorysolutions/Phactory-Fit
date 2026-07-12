@@ -1,7 +1,7 @@
 'use strict';
 
 const STORAGE_KEY = 'phactoryfit.v1';
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 const MAX_LOG_ENTRIES_PER_DAY = 5000;
 const MAX_CUSTOM_FOODS = 10000;
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -563,21 +563,50 @@ function render() {
   $('#greeting').textContent = `${hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'}, ${profile.name}`;
   $('#coachHeadline').textContent = score >= 80 ? 'Strong consistency today. Keep the finish simple.' : score >= 45 ? 'A few focused actions can turn this into a strong day.' : 'Start small: log the next thing you eat or drink.';
   $('#dailyScore').textContent = score;
-  $('#scoreRing').style.background = `conic-gradient(var(--accent) ${score}%,rgba(255,255,255,.14) ${score}%)`;
+  const scorePercent = clamp(score, 0, 100);
+  $('#scoreRing').style.setProperty('--score', `${scorePercent}%`);
+  $('#scoreRing').style.setProperty('--score-blue', `${scorePercent * .48}%`);
+  $('#scoreRing').style.setProperty('--score-purple', `${scorePercent * .78}%`);
   $('#scoreRing').setAttribute('aria-label', `Daily score: ${score} percent`);
+
+  const caloriePercent = clamp(totals.calories / Math.max(1, calorieGoal) * 100, 0, 100);
+  const proteinPercent = clamp(totals.protein / Math.max(1, profile.proteinGoal) * 100, 0, 100);
+  const carbPercent = clamp(totals.carbs / Math.max(1, profile.carbGoal) * 100, 0, 100);
+  const fatPercent = clamp(totals.fat / Math.max(1, profile.fatGoal) * 100, 0, 100);
+  const calorieOver = totals.calories > calorieGoal;
+  const proteinOver = totals.protein > profile.proteinGoal;
+  const carbOver = totals.carbs > profile.carbGoal;
+  const fatOver = totals.fat > profile.fatGoal;
 
   setText('caloriesConsumed', round(totals.calories));
   setText('calorieGoal', round(calorieGoal));
-  setText('caloriesRemaining', totals.calories > calorieGoal ? `${round(totals.calories - calorieGoal)} over` : `${round(calorieGoal - totals.calories)} left`);
-  $('#calorieBar').style.width = `${clamp(totals.calories / calorieGoal * 100, 0, 100)}%`;
+  setText('caloriesRemaining', calorieOver ? `${round(totals.calories - calorieGoal)} over` : `${round(calorieGoal - totals.calories)} left`);
+  setText('caloriePercent', `${round(caloriePercent)}%`);
+  setText('calorieStatus', calorieOver ? 'Over goal' : 'On track');
+  $('#calorieBar').style.width = `${caloriePercent}%`;
+  setMetricGauge('calorieGauge', caloriePercent, `Calories: ${round(caloriePercent)} percent of goal`, calorieOver);
+
   setText('proteinConsumed', round(totals.protein));
   setText('proteinGoal', profile.proteinGoal);
-  setText('proteinRemaining', totals.protein > profile.proteinGoal ? `${round(totals.protein - profile.proteinGoal)}g over` : `${Math.max(0, round(profile.proteinGoal - totals.protein))}g left`);
-  $('#proteinBar').style.width = `${clamp(totals.protein / Math.max(1, profile.proteinGoal) * 100, 0, 100)}%`;
-  setText('carbConsumed', `${round(totals.carbs)}g`);
-  setText('fatConsumed', `${round(totals.fat)}g`);
-  setText('carbGoalText', `Goal ${profile.carbGoal} g`);
-  setText('fatGoalText', `Goal ${profile.fatGoal} g`);
+  setText('proteinRemaining', proteinOver ? `${round(totals.protein - profile.proteinGoal)}g over` : `${Math.max(0, round(profile.proteinGoal - totals.protein))}g left`);
+  setText('proteinPercent', `${round(proteinPercent)}%`);
+  setText('proteinStatus', proteinOver ? 'Goal secured' : 'On track');
+  $('#proteinBar').style.width = `${proteinPercent}%`;
+  setMetricGauge('proteinGauge', proteinPercent, `Protein: ${round(proteinPercent)} percent of goal`, false);
+
+  setText('carbConsumed', round(totals.carbs));
+  setText('carbGoalValue', profile.carbGoal);
+  setText('carbRemaining', carbOver ? `${round(totals.carbs - profile.carbGoal)}g over` : `${Math.max(0, round(profile.carbGoal - totals.carbs))}g left`);
+  setText('carbPercent', `${round(carbPercent)}%`);
+  setText('carbStatus', carbOver ? 'Over goal' : 'On track');
+  setMetricGauge('carbGauge', carbPercent, `Carbohydrates: ${round(carbPercent)} percent of goal`, carbOver);
+
+  setText('fatConsumed', round(totals.fat));
+  setText('fatGoalValue', profile.fatGoal);
+  setText('fatRemaining', fatOver ? `${round(totals.fat - profile.fatGoal)}g over` : `${Math.max(0, round(profile.fatGoal - totals.fat))}g left`);
+  setText('fatPercent', `${round(fatPercent)}%`);
+  setText('fatStatus', fatOver ? 'Over goal' : 'On track');
+  setMetricGauge('fatGauge', fatPercent, `Fat: ${round(fatPercent)} percent of goal`, fatOver);
   setText('waterValue', round(day.water, 1));
   setText('stepsValue', Math.round(day.steps).toLocaleString());
   setText('workoutValue', round(day.workoutMinutes));
@@ -590,12 +619,55 @@ function render() {
   renderProgress();
   renderCoach();
   populateSettings();
+  initializeMotionEffects();
   saveState();
 }
 
 function setText(id, value) {
   const element = document.getElementById(id);
   if (element) element.textContent = value;
+}
+
+function setMetricGauge(id, percent, label, isOver = false) {
+  const gauge = document.getElementById(id);
+  if (!gauge) return;
+  const normalized = clamp(percent, 0, 100);
+  gauge.style.setProperty('--value', `${normalized}%`);
+  gauge.style.setProperty('--angle', `${normalized * 3.6}deg`);
+  gauge.classList.toggle('over-goal', Boolean(isOver));
+  gauge.setAttribute('aria-label', label);
+}
+
+let motionObserver = null;
+
+function initializeMotionEffects() {
+  const selector = '.reveal-item, .view .section-card, .view .meal-section, .view .action-card, .view .stats-row article, .view .coach-card, .view .coach-item';
+  const items = [...document.querySelectorAll(selector)].filter(item => item.dataset.motionBound !== 'true');
+  if (!items.length) return;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced || !('IntersectionObserver' in window)) {
+    items.forEach(item => {
+      item.dataset.motionBound = 'true';
+      item.classList.add('is-visible');
+    });
+    return;
+  }
+  document.documentElement.classList.add('motion-ready');
+  if (!motionObserver) {
+    motionObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        motionObserver.unobserve(entry.target);
+      });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:.08});
+  }
+  items.forEach((item, index) => {
+    item.dataset.motionBound = 'true';
+    item.classList.add('scroll-reveal');
+    item.style.setProperty('--reveal-delay', `${Math.min(index % 6, 5) * 45}ms`);
+    motionObserver.observe(item);
+  });
 }
 
 function renderDiary() {
@@ -1349,7 +1421,7 @@ function barcodeCameraErrorMessage(error) {
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'The camera is busy or unavailable. Close other camera apps, return to PhactoryFit, and try again.';
   if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The requested rear-camera mode was unavailable. PhactoryFit will retry with simpler camera settings.';
-  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.8.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
+  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.9.0 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
   if (name === 'TimeoutError') return 'No barcode was detected. Hold the package 6–10 inches away, avoid glare, and keep the entire barcode inside the frame.';
   return 'The barcode camera could not start. Check camera permission, lighting, and the secure HTTPS address, then try again.';
 }
@@ -1936,7 +2008,7 @@ async function startBarcodeCamera(forceStart = false) {
   result.innerHTML = '<p class="form-note camera-status">Loading barcode scanner engine…</p>';
 
   try {
-    // The scanner is bundled inline in v1.6.2, but this also retries the root
+    // The scanner is bundled as a pinned same-origin asset. This also retries the root
     // copy if Safari loaded an older cached page or the first script load failed.
     await ensureBarcodeScannerLibrary();
     if (session !== barcodeScanSession || !modal.open) return;
@@ -2102,6 +2174,7 @@ const coachActionHandlers = {
 };
 
 document.addEventListener('click', event => {
+  if (event.target.closest('#heroLogButton')) { openModal('food'); return; }
   const navigation = event.target.closest('[data-view-target]');
   if (navigation) { navigate(navigation.dataset.viewTarget); return; }
   const link = event.target.closest('[data-nav]');
