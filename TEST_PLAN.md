@@ -1,4 +1,4 @@
-# PhactoryFit v1.6.1 Validation Plan
+# PhactoryFit v1.6.2 Validation Plan
 
 ## Automated checks completed
 
@@ -20,7 +20,7 @@
 1. Deploy every file from the flat ZIP to the GitHub repository root.
 2. Wait for GitHub Pages deployment to finish.
 3. Open the Pages URL directly in Safari.
-4. Open Settings and confirm **Version 1.6.1**.
+4. Open Settings and confirm **Version 1.6.2**.
 5. Open Log → Barcode → Use camera.
 6. Allow camera access.
 7. Hold a UPC/EAN barcode inside the green frame, 6–10 inches away.

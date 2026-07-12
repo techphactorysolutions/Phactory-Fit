@@ -1,15 +1,15 @@
-const CACHE = 'phactoryfit-v1.6.1';
+const CACHE = 'phactoryfit-v1.6.2';
 const OFFLINE_PAGE = './index.html';
 const CORE_SHELL = [
   './',
   OFFLINE_PAGE,
-  './styles.css?v=1.6.1',
-  './app.js?v=1.6.1',
-  './config.js?v=1.6.1',
+  './styles.css?v=1.6.2',
+  './app.js?v=1.6.2',
+  './config.js?v=1.6.2',
   './manifest.webmanifest'
 ];
 const OPTIONAL_SHELL = [
-  './zxing-browser.min.js?v=1.6.1',
+  './zxing-browser.min.js?v=1.6.2',
   './apple-touch-icon.png',
   './favicon-32.png',
   './apple-touch-icon-180.png',

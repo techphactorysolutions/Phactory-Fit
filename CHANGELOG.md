@@ -1,5 +1,16 @@
 # Changelog
-## 1.6.1 — iPhone Scanner Engine Hotfix
+
+## v1.6.2 — iPhone Safari camera lifecycle repair
+
+- Removed `pagehide` camera teardown because iPhone Safari can emit that lifecycle event while presenting or dismissing the camera permission UI.
+- Requests minimal rear-camera constraints first on iPhone, then applies optional focus/zoom optimizations after the stream is live.
+- Keeps a granted live stream open when Safari delays or pauses the `<video>` preview.
+- Adds a manual **Start preview** recovery path without forcing another permission request.
+- Reattaches the stream after transient visibility changes.
+- Detects muted/ended camera tracks and performs one controlled reconnect instead of silently closing the scanner.
+- Adds runtime camera diagnostics for support testing.
+
+## 1.6.2 — iPhone Scanner Engine Hotfix
 
 - Moved all required runtime assets to the repository root for reliable GitHub mobile uploads.
 - Embedded the ZXing scanner engine directly in `index.html`, so the camera decoder is available whenever the page loads.
@@ -11,7 +22,7 @@
 - Flattened manifest icons to avoid missing nested folders during iPhone GitHub uploads.
 
 
-## v1.6.1 — July 12, 2026
+## v1.6.2 — July 12, 2026
 
 ### Corrected nutrition calculations
 - Reject packaged-food records that omit any core macro instead of silently treating missing values as zero

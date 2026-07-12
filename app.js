@@ -1,7 +1,7 @@
 'use strict';
 
 const STORAGE_KEY = 'phactoryfit.v1';
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.6.2';
 const MAX_LOG_ENTRIES_PER_DAY = 5000;
 const MAX_CUSTOM_FOODS = 10000;
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -232,6 +232,9 @@ const onlineFoodSearchCache = new Map();
 let cameraVisibilityTimer = null;
 let barcodeDecodeRunning = false;
 let barcodeLibraryLoadPromise = null;
+let cameraPermissionInFlight = false;
+let cameraUnexpectedEndRetries = 0;
+let cameraLifecycleNote = '';
 
 function saveState() {
   try {
@@ -1126,7 +1129,7 @@ function barcodeCameraErrorMessage(error) {
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
   if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'The camera is busy or unavailable. Close other camera apps, return to PhactoryFit, and try again.';
   if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The requested rear-camera mode was unavailable. PhactoryFit will retry with simpler camera settings.';
-  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.6.1 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
+  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner engine could not initialize. Deploy the complete v1.6.2 package, which includes an embedded decoder and a root recovery copy, then reopen Safari.';
   if (name === 'TimeoutError') return 'No barcode was detected. Hold the package 6–10 inches away, avoid glare, and keep the entire barcode inside the frame.';
   return 'The barcode camera could not start. Check camera permission, lighting, and the secure HTTPS address, then try again.';
 }
@@ -1289,21 +1292,50 @@ function decodeBarcodeCanvas(reader, canvas) {
   }
 }
 
+function isIOSSafariLike() {
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isWebKit = /WebKit/i.test(ua);
+  return isIOS && isWebKit;
+}
+
 async function requestBarcodeStream(deviceId = '') {
-  const deviceConstraint = deviceId ? {deviceId:{exact:deviceId}} : {facingMode:{ideal:'environment'}};
-  const attempts = [
-    {audio:false,video:{...deviceConstraint,width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:30,max:30}}},
-    {audio:false,video:deviceId ? {deviceId:{exact:deviceId}} : {facingMode:'environment'}},
-    {audio:false,video:true}
-  ];
+  // iPhone Safari is more reliable when the first permission request uses a
+  // minimal constraint set. Resolution and focus are optimized only after the
+  // stream is live; asking for 1080p during the permission transition can make
+  // WebKit return a stream whose preview immediately stalls.
+  const simpleRear = deviceId ? {deviceId:{exact:deviceId}} : {facingMode:{ideal:'environment'}};
+  const detailedRear = {...simpleRear,width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:24,max:30}};
+  const attempts = isIOSSafariLike()
+    ? [
+        {audio:false,video:simpleRear},
+        {audio:false,video:true}
+      ]
+    : [
+        {audio:false,video:detailedRear},
+        {audio:false,video:simpleRear},
+        {audio:false,video:true}
+      ];
   let lastError;
-  for (const constraints of attempts) {
-    try {
-      return await navigator.mediaDevices.getUserMedia(constraints);
-    } catch (error) {
-      lastError = error;
-      if (['NotAllowedError','PermissionDeniedError','SecurityError','NotReadableError'].includes(String(error?.name || ''))) throw error;
+  cameraPermissionInFlight = true;
+  try {
+    for (const constraints of attempts) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const track = stream?.getVideoTracks?.()[0];
+        if (!track || track.readyState === 'ended') {
+          stream?.getTracks?.().forEach(item => item.stop());
+          lastError = new DOMException('Camera stream ended before preview started', 'NotReadableError');
+          continue;
+        }
+        return stream;
+      } catch (error) {
+        lastError = error;
+        if (['NotAllowedError','PermissionDeniedError','SecurityError','NotReadableError'].includes(String(error?.name || ''))) throw error;
+      }
     }
+  } finally {
+    cameraPermissionInFlight = false;
   }
   throw lastError || new DOMException('Camera unavailable', 'NotFoundError');
 }
@@ -1392,6 +1424,7 @@ async function switchBarcodeCamera() {
   const currentId = activeMediaStream?.getVideoTracks?.()[0]?.getSettings?.().deviceId || preferredBarcodeDeviceId;
   const currentIndex = Math.max(0, barcodeVideoDevices.findIndex(device => device.deviceId === currentId));
   preferredBarcodeDeviceId = barcodeVideoDevices[(currentIndex + 1) % barcodeVideoDevices.length]?.deviceId || '';
+  cameraUnexpectedEndRetries = 0;
   stopBarcodeCamera();
   await startBarcodeCamera(true);
 }
@@ -1585,17 +1618,69 @@ async function beginBarcodeDecoding(video, result, session) {
   }
 }
 
+function keepCameraOpenForManualResume(result, message) {
+  const resumeButton = $('#resumeBarcodePreview');
+  if (resumeButton) resumeButton.hidden = false;
+  const shell = $('#barcodeCameraShell');
+  if (shell) shell.hidden = false;
+  setBarcodeCameraMode(true);
+  setBarcodeCameraButton(true);
+  if (result) result.innerHTML = `<p class="form-note camera-status">${escapeHtml(message)}</p>`;
+}
+
+function bindCameraTrackLifecycle(stream, session) {
+  const track = stream?.getVideoTracks?.()[0];
+  if (!track) return;
+  track.onmute = () => {
+    cameraLifecycleNote = 'Camera stream temporarily paused by Safari.';
+    const result = $('#barcodeResult');
+    if (session === barcodeScanSession && modal.open && result) {
+      keepCameraOpenForManualResume(result, 'Safari temporarily paused the camera. Tap “Start preview” to resume.');
+    }
+  };
+  track.onunmute = () => {
+    cameraLifecycleNote = '';
+    const video = $('#barcodeVideo');
+    if (session === barcodeScanSession && modal.open && video?.paused) void resumeBarcodePreview();
+  };
+  track.onended = () => {
+    if (session !== barcodeScanSession || !modal.open || cameraPermissionInFlight) return;
+    activeMediaStream = null;
+    const result = $('#barcodeResult');
+    if (cameraUnexpectedEndRetries < 1) {
+      cameraUnexpectedEndRetries += 1;
+      if (result) result.innerHTML = '<p class="form-note camera-status">Safari ended the camera stream. Reconnecting once…</p>';
+      setTimeout(() => {
+        if (session === barcodeScanSession && modal.open) void startBarcodeCamera(true);
+      }, 350);
+      return;
+    }
+    keepCameraOpenForManualResume(result, 'Safari ended the camera stream. Tap “Use camera” to reconnect, or use “Take barcode photo.”');
+    setBarcodeCameraButton(false);
+  };
+}
+
 async function resumeBarcodePreview() {
   const video = $('#barcodeVideo');
   const result = $('#barcodeResult');
   if (!video || !result || !activeMediaStream || !modal.open) return;
   const session = barcodeScanSession;
+  if (video.srcObject !== activeMediaStream) video.srcObject = activeMediaStream;
   const played = await playBarcodeVideo(video, 5000);
   if (!played) {
-    result.innerHTML = '<p class="form-note">Safari still paused the preview. Close the scanner, confirm Safari camera permission, and try again.</p>';
+    keepCameraOpenForManualResume(result, 'Safari still has the camera stream but paused the preview. Tap “Start preview” again, or use “Take barcode photo.”');
     return;
   }
-  await waitForVideoReady(video, 5000);
+  try {
+    await waitForVideoReady(video, 5000);
+  } catch (error) {
+    const track = activeMediaStream?.getVideoTracks?.()[0];
+    if (track?.readyState === 'live') {
+      keepCameraOpenForManualResume(result, 'The camera is active, but Safari has not displayed the preview yet. Tap “Start preview” once more.');
+      return;
+    }
+    throw error;
+  }
   await beginBarcodeDecoding(video, result, session);
 }
 
@@ -1626,7 +1711,7 @@ async function startBarcodeCamera(forceStart = false) {
   result.innerHTML = '<p class="form-note camera-status">Loading barcode scanner engine…</p>';
 
   try {
-    // The scanner is bundled inline in v1.6.1, but this also retries the root
+    // The scanner is bundled inline in v1.6.2, but this also retries the root
     // copy if Safari loaded an older cached page or the first script load failed.
     await ensureBarcodeScannerLibrary();
     if (session !== barcodeScanSession || !modal.open) return;
@@ -1642,19 +1727,28 @@ async function startBarcodeCamera(forceStart = false) {
       return;
     }
     activeMediaStream = requestedStream;
+    bindCameraTrackLifecycle(activeMediaStream, session);
     video.playsInline = true;
     video.muted = true;
     video.defaultMuted = true;
     video.autoplay = true;
     video.srcObject = activeMediaStream;
-    const playAttempt = playBarcodeVideo(video);
-    await waitForVideoReady(video, 7000);
-    const played = await playAttempt;
+
+    const played = await playBarcodeVideo(video, 5000);
     if (!played) {
-      const resumeButton = $('#resumeBarcodePreview');
-      if (resumeButton) resumeButton.hidden = false;
-      result.innerHTML = '<p class="form-note camera-status">Camera permission is active. Tap “Start preview” once to continue in Safari.</p>';
+      keepCameraOpenForManualResume(result, 'Camera permission is active. Safari paused the preview; tap “Start preview” to continue.');
       return;
+    }
+
+    try {
+      await waitForVideoReady(video, 8000);
+    } catch (error) {
+      const track = activeMediaStream?.getVideoTracks?.()[0];
+      if (track?.readyState === 'live') {
+        keepCameraOpenForManualResume(result, 'Camera permission is active, but Safari delayed the preview. Tap “Start preview” to continue.');
+        return;
+      }
+      throw error;
     }
     await beginBarcodeDecoding(video, result, session);
   } catch (error) {
@@ -1985,7 +2079,7 @@ $('#resetButton').addEventListener('click', () => {
 $('#modalContent').addEventListener('click', event => {
   if (event.target.id === 'createFoodButton') showCustomFoodForm('', selectedMealFromCurrentModal());
   if (event.target.id === 'lookupBarcode') lookupBarcode($('#barcodeInput').value);
-  if (event.target.id === 'cameraBarcode' || event.target.id === 'retryBarcodeCamera') void startBarcodeCamera();
+  if (event.target.id === 'cameraBarcode' || event.target.id === 'retryBarcodeCamera') { cameraUnexpectedEndRetries = 0; void startBarcodeCamera(); }
   if (event.target.id === 'barcodeTorch') void toggleBarcodeTorch();
   if (event.target.id === 'barcodeSwitchCamera') void switchBarcodeCamera();
   if (event.target.id === 'resumeBarcodePreview') void resumeBarcodePreview();
@@ -2012,15 +2106,23 @@ $('#modalContent').addEventListener('keydown', event => {
 document.addEventListener('visibilitychange', () => {
   if (cameraVisibilityTimer) clearTimeout(cameraVisibilityTimer);
   cameraVisibilityTimer = null;
-  // iPhone Safari can report a transient hidden state while presenting camera
-  // permission or returning from system UI. Keep the stream alive; pagehide and
-  // modal close remain the authoritative cleanup paths.
+  // iPhone Safari may dispatch hidden/pagehide-style lifecycle transitions
+  // while showing the system camera permission sheet. Never stop a requested
+  // camera merely because the page briefly became hidden. When visible again,
+  // reattach and resume the same live stream.
   if (!document.hidden && activeMediaStream && modal.open) {
-    const video = $('#barcodeVideo');
-    if (video?.paused) void resumeBarcodePreview();
+    cameraVisibilityTimer = setTimeout(() => {
+      const video = $('#barcodeVideo');
+      if (video && video.srcObject !== activeMediaStream) video.srcObject = activeMediaStream;
+      if (video?.paused || !video?.videoWidth) void resumeBarcodePreview();
+    }, 150);
   }
 });
-window.addEventListener('pagehide', stopBarcodeCamera);
+// Do not use pagehide for camera cleanup on iPhone Safari: the permission UI
+// can trigger it and would immediately kill the stream the user just allowed.
+// Closing the modal stops every track; actual document unload also releases
+// media automatically, with beforeunload retained as a best-effort cleanup.
+window.addEventListener('beforeunload', stopBarcodeCamera);
 
 modal.addEventListener('click', event => {
   if (event.target === modal) modal.close();
@@ -2035,5 +2137,6 @@ window.addEventListener('resize', () => {
   if ($('.view[data-view="progress"]').classList.contains('active')) renderProgress();
 });
 
+window.__PHACTORYFIT_CAMERA_DIAGNOSTICS = () => ({version:APP_VERSION, permissionInFlight:cameraPermissionInFlight, streamActive:Boolean(activeMediaStream), trackState:activeMediaStream?.getVideoTracks?.()[0]?.readyState || 'none', lifecycleNote:cameraLifecycleNote, session:barcodeScanSession});
 registerServiceWorker();
 render();

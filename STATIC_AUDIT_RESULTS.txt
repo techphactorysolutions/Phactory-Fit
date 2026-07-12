@@ -1,62 +1,16 @@
-PASS app.js JavaScript syntax 
-PASS service-worker.js JavaScript syntax 
-PASS config.js JavaScript syntax 
-PASS zxing-browser.min.js JavaScript syntax 
-PASS index.html exists 
-PASS styles.css exists 
-PASS app.js exists 
-PASS config.js exists 
-PASS service-worker.js exists 
-PASS manifest.webmanifest exists 
-PASS apple-touch-icon.png exists 
-PASS favicon-32.png exists 
-PASS apple-touch-icon-180.png exists 
-PASS icon-192.png exists 
-PASS icon-512.png exists 
-PASS icon-maskable-192.png exists 
-PASS icon-maskable-512.png exists 
-PASS zxing-browser.min.js exists 
-PASS ZXING_LICENSE.txt exists 
-PASS runtime app version 1.6.1 
-PASS versioned app reference 
-PASS versioned stylesheet reference 
-PASS scanner engine embedded in index 
-PASS no required nested scanner script 
-PASS root scanner recovery copy valid 
-PASS dynamic scanner recovery loader 
-PASS legacy vendor fallback retained 
-PASS camera loads decoder before stream request 
-PASS scanner retry action present 
-PASS camera close cleanup retained 
-PASS iPhone inline playback retained 
-PASS service-worker cache version 
-PASS service-worker resilient optional caching 
-PASS service-worker root scanner recovery 
-PASS service-worker no required nested runtime assets 
-PASS service-worker network-first code updates 
-PASS controller-change reload added 
-PASS full-screen iPhone scanner styling 
-PASS manifest JSON parses 
-PASS manifest standalone display 
-PASS manifest root-only icons 
-PASS manifest icon exists icon-192.png 
-PASS manifest icon exists icon-512.png 
-PASS manifest icon exists icon-maskable-192.png 
-PASS manifest icon exists icon-maskable-512.png 
-PASS apple-touch-icon.png dimensions 
-PASS apple-touch-icon-180.png dimensions 
-PASS favicon-32.png dimensions 
-PASS icon-192.png dimensions 
-PASS icon-512.png dimensions 
-PASS icon-maskable-192.png dimensions 
-PASS icon-maskable-512.png dimensions 
-PASS HTML asset exists manifest.webmanifest 
-PASS HTML asset exists favicon-32.png 
-PASS HTML asset exists apple-touch-icon.png 
-PASS HTML asset exists apple-touch-icon.png 
-PASS HTML asset exists styles.css 
-PASS HTML asset exists config.js 
-PASS HTML asset exists app.js 
-PASS ZXing Apache license included 
-PASS credential and private-key scan 
-RESULT 61/61 passed
+PhactoryFit v1.6.2 static and deployment audit
+
+Deployment package audit: 61/61 passed
+Full source audit: 83/83 passed
+
+Validated:
+- JavaScript syntax
+- Versioned app and stylesheet references
+- Embedded and root recovery barcode decoder
+- Permission-safe camera lifecycle cleanup
+- iPhone inline-video support
+- Service-worker cache version and update behavior
+- Manifest and icon files
+- Required runtime references
+- ZXing license
+- Credential/private-key scan

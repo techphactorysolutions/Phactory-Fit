@@ -1,10 +1,13 @@
-PhactoryFit v1.6.1 browser verification
+PhactoryFit v1.6.2 browser and camera test results
 
-PASS 17/17 regression browser tests
-PASS embedded scanner initializes from index.html
-PASS root scanner recovery loader restores decoder
-PASS camera startup no longer enters ScannerLibraryUnavailable path
-PASS real barcode-photo decoding
-PASS simulated live-camera decoding and lifecycle handling
+Regression suite: 17/17 passed
+Focused iPhone Safari camera lifecycle checks: 4/4 passed
+Total reported browser/lifecycle checks: 21/21 passed
 
-Physical iPhone camera permission/autofocus remains an on-device validation step.
+Focused checks:
+PASS pagehide during permission does not terminate camera
+PASS iPhone receives minimal first camera constraints
+PASS paused Safari preview keeps stream and offers Start preview
+PASS explicit close still stops all camera tracks
+
+The suite uses a mocked MediaStream and iPhone Safari user agent. A physical iPhone camera was not available in the test environment.

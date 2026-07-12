@@ -1,10 +1,10 @@
-# PhactoryFit v1.6.1
+# PhactoryFit v1.6.2
 
 PhactoryFit is an original, mobile-first nutrition and fitness tracker designed by **Tech Phactory Solutions LLC**. The current release is a static Progressive Web App intended for GitHub Pages, iPhone Safari, and installation to the iPhone Home Screen.
 
 ## Current production scope
 
-The v1.6.1 audit uses the implemented v1.5.0 feature set as the source of truth. Placeholder examples from the audit prompt—such as supplement cycling, body photos, wearable synchronization, and a local AI agent—were not treated as existing requirements because they are not implemented in this codebase.
+The v1.6.2 audit uses the implemented v1.5.0 feature set as the source of truth. Placeholder examples from the audit prompt—such as supplement cycling, body photos, wearable synchronization, and a local AI agent—were not treated as existing requirements because they are not implemented in this codebase.
 
 ### Nutrition and food logging
 
@@ -38,37 +38,17 @@ The v1.6.1 audit uses the implemented v1.5.0 feature set as the source of truth.
 - No build step
 - No embedded API keys, passwords, or private credentials
 
-## v1.6.1 production-audit repairs
+## v1.6.2 iPhone camera repair
 
-### Nutrition correctness
+- Removed the `pagehide` listener that could stop the camera while iPhone Safari was presenting or dismissing the permission sheet.
+- Keeps a granted camera stream open when Safari delays or pauses the video preview.
+- Shows **Start preview** for a user-gesture recovery instead of immediately closing the scanner.
+- Requests simple rear-camera constraints first on iPhone, then applies optional focus and zoom after the stream is live.
+- Reattaches the same stream after transient visibility changes.
+- Performs one controlled reconnect if Safari unexpectedly ends the track.
+- Continues to stop all tracks when the user explicitly closes the scanner or modal.
 
-- Product records are no longer accepted when calories, protein, carbohydrates, or fat are missing. Missing macros are not silently converted to zero.
-- Serving conversion now handles grams, kilograms, milligrams, milliliters, liters, ounces, pounds, and fluid ounces.
-- Labels containing both household and metric quantities—such as `1 oz (28 g)`—prefer the explicit metric quantity.
-- Energy reported only in kilojoules is converted to kilocalories using 4.184 kJ per kcal.
-- Sodium and cholesterol conversion now respects whether the source value is expressed in grams or milligrams.
-- Voice food entry now reaches the same online packaged-food search used by typed searches.
-
-### Data integrity
-
-- Imported future weigh-ins are discarded and cannot replace the current weight.
-- Duplicate saved foods are removed by normalized food ID and barcode.
-- Daily food-entry counts and cumulative workout, exercise-calorie, water, and custom-food values are bounded to defensive limits.
-- External product images are accepted only from HTTPS URLs.
-
-### Progress accuracy
-
-- The weight chart spaces points according to the actual interval between dates instead of distributing irregular weigh-ins evenly.
-- The chart now includes an accessible text summary.
-- Adaptive adherence calculations use the last seven completed days and do not penalize an unfinished current day.
-
-### iPhone and Safari behavior
-
-- Transient Safari visibility changes no longer stop the camera stream.
-- Barcode decoding pauses while the page is hidden and resumes when visible.
-- Camera tracks are still stopped on explicit scanner close and real page exit.
-- Form controls use a 16 px minimum font size to prevent unwanted Safari input zoom.
-- Keyboard focus, reduced-motion, touch-action, and safe-area behavior were improved.
+The nutrition, food-search, serving-size, data-integrity, progress-chart, backup, offline, and accessibility repairs from v1.6.0/v1.6.1 remain included.
 
 ## Food-search workflow
 
@@ -95,34 +75,27 @@ A barcode identifies a product; it does not contain the nutrition data itself. T
 
 ## GitHub Pages deployment
 
-1. Upload every file and folder from this package to the repository root.
-2. Keep the `assets`, `vendor`, and `tests` folders intact.
-3. Configure GitHub Pages to deploy from the `main` branch and repository root.
-4. Wait for deployment to complete.
-5. Open the HTTPS GitHub Pages address in Safari.
-6. Refresh twice so the `phactoryfit-v1.6.1` service-worker cache replaces the previous release.
-7. Fully close and reopen Safari or the installed Home Screen app.
-8. Grant camera access when requested.
+The GitHub-ready ZIP is intentionally flat. Upload every file from the ZIP directly to the repository root. No nested runtime folders are required.
 
-Existing local data remains compatible because the local-storage key is unchanged. Export a backup before replacing a public deployment.
+1. Export a PhactoryFit backup first if you already have logged data.
+2. Delete or replace the older repository files.
+3. Upload every file from the v1.6.2 ZIP to the repository root.
+4. Wait for GitHub Pages to finish deploying.
+5. Open the HTTPS Pages address directly in Safari.
+6. Refresh twice, then fully close and reopen Safari.
+7. Open Settings and confirm **Version 1.6.2**.
+8. Test **Log → Barcode → Use camera**.
 
-## Run the audit suite
+Existing diary data remains compatible because the local-storage key is unchanged.
 
-Requirements: Python 3.11+, Node.js, and Chromium for Playwright.
+## Audit results
 
-```bash
-python -m pip install -r requirements-test.txt
-playwright install chromium
-python tests/static_audit.py
-python tests/test_browser.py
-```
+- 17/17 full browser regression tests passed.
+- 4/4 focused iPhone camera lifecycle checks passed.
+- 61/61 deployment-package checks passed.
+- 83/83 full source-audit checks passed.
 
-Expected result:
-
-- `83/83` static, PWA, asset, security, and accessibility checks
-- `17/17` browser, barcode, calculation, import, chart, and camera-lifecycle tests
-
-The browser suite uses mocked product responses and a generated EAN-13 fixture. It does not upload diary or body-weight data.
+The deployable ZIP omits development-only test folders. The included `BROWSER_TEST_RESULTS.txt`, `STATIC_AUDIT_RESULTS.txt`, and `AUDIT_REPORT.md` document the completed checks.
 
 ## Required physical iPhone verification
 
@@ -150,7 +123,7 @@ No secret should be placed in this public client-side file.
 - Community product records can be incomplete or inaccurate; package-label verification remains necessary.
 - Physical camera autofocus and permission behavior remain device-dependent.
 - Local browser storage is not encrypted and is removed when Safari website data is cleared.
-- Multi-device synchronization, authentication, body photos, supplement scheduling, workout set/repetition progression, wearable integration, and AI coaching are not part of v1.6.1.
+- Multi-device synchronization, authentication, body photos, supplement scheduling, workout set/repetition progression, wearable integration, and AI coaching are not part of v1.6.2.
 - Apple Health requires a future native wrapper with HealthKit entitlements.
 - Fitness guidance is general information and is not medical advice.
 
@@ -160,4 +133,4 @@ Copyright © 2026 Tech Phactory Solutions LLC. All rights reserved.
 
 ## iPhone deployment note
 
-Version 1.6.1 keeps every required runtime file at the repository root and embeds the barcode decoder in `index.html`. Upload all root files from the ZIP. The `assets`, `vendor`, and `tests` folders are no longer required for the deployed app.
+Version 1.6.2 keeps every required runtime file at the repository root and embeds the barcode decoder in `index.html`. Upload every file from the GitHub-ready ZIP directly to the repository root.

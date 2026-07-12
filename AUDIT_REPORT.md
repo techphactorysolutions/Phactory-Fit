@@ -1,65 +1,77 @@
-# PhactoryFit v1.6.1 — iPhone Barcode Camera Hotfix Audit
+# PhactoryFit v1.6.2 — iPhone Safari Camera Lifecycle Repair
 
 ## Reported failure
 
-On iPhone Safari, tapping **Use camera** immediately returned:
+On iPhone Safari, **Use camera** requested rear-camera permission and then the scanner immediately closed. Manual barcode entry continued to work.
 
-> The bundled barcode scanner did not load.
+## Confirmed root cause
 
-That message can only be produced by the `ScannerLibraryUnavailable` path. The camera permission itself was not the primary failure. The decoder global (`window.ZXingBrowser`) was unavailable when the live decode loop started.
+The previous build registered `stopBarcodeCamera()` on the global `pagehide` event. iPhone Safari can emit page lifecycle transitions while presenting or dismissing system permission/browser UI. The handler interpreted that transition as a real page exit, incremented the scanner session, stopped every camera track, cleared the video source, and hid the scanner immediately after permission was granted.
 
-## Root cause
-
-The previous release depended on `vendor/zxing-browser.min.js`, a required file inside a nested folder. If that folder was omitted during a GitHub mobile upload, served from an older service-worker cache, or failed to load, the app still requested the camera stream. The first decoding pass then threw `ScannerLibraryUnavailable`; the catch path stopped the stream, making the camera appear to open and immediately close.
+A second failure mode also existed: when Safari granted a live camera stream but delayed or rejected `<video>.play()`, startup treated the preview delay as fatal and closed the stream instead of preserving it for a user-gesture retry.
 
 ## Repairs
 
-### P0 — Scanner engine deployment failure
+### P0 — Permission-sheet teardown
 
-- Embedded the ZXing barcode engine directly in `index.html`.
-- The scanner no longer depends on a nested folder to start.
-- Added a second root-level `zxing-browser.min.js` recovery copy.
-- Added an asynchronous recovery loader that retries the root copy and then the legacy `vendor/` path.
-- Changed camera startup order so the decoder is verified **before** Safari is asked for camera access.
-- Added a visible **Retry scanner engine** action if initialization ever fails again.
+- Removed camera teardown from `pagehide`.
+- Retained explicit track cleanup when the scanner/modal closes.
+- Retained best-effort cleanup on `beforeunload`; browser document destruction also releases media tracks.
+- Reattaches and resumes the same stream after transient visibility changes.
 
-### P1 — GitHub/iPhone deployment reliability
+### P0 — Safari preview recovery
 
-- Flattened every required runtime asset to the repository root.
-- Updated the web manifest to use root-level icons.
-- Removed nested `assets/` and `vendor/` paths from required service-worker installation.
-- Made optional cache population use `Promise.allSettled`, so one missing icon or recovery asset cannot prevent a new service worker from installing.
-- Changed JavaScript and CSS fetches to network-first, reducing stale-code persistence.
-- Added a one-time reload when a newly installed service worker takes control.
-- Added the displayed version number in Settings so the deployed build can be verified as **1.6.1**.
+- Keeps a granted live stream open when Safari pauses or delays the video preview.
+- Displays **Start preview** without requesting permission again.
+- Does not hide the camera shell for a recoverable preview delay.
+- Detects stream mute/unmute and attempts a controlled resume.
+- Detects an unexpectedly ended track and performs one controlled reconnect, avoiding infinite retry loops.
+
+### P1 — iPhone camera constraints
+
+- Requests a minimal rear-camera constraint set first on iPhone Safari.
+- Applies optional continuous focus and zoom only after the stream is live.
+- Falls back to a generic camera request if the rear-camera preference is unavailable.
+
+### P1 — Support diagnostics
+
+- Added a runtime camera diagnostic object containing app version, permission state, stream state, track state, scanner session, and lifecycle note.
+- Updated the visible Settings version to **1.6.2**.
+- Updated the service-worker cache to `phactoryfit-v1.6.2`.
 
 ## Verification
 
-### Browser and feature suite
+### Full regression suite
 
-- 17/17 existing browser, barcode, nutrition, import, chart, and camera lifecycle tests passed.
-- Embedded scanner initialization passed.
-- Root scanner recovery after deleting `window.ZXingBrowser` passed.
-- Camera startup no longer entered the `ScannerLibraryUnavailable` path.
-- Real EAN-13 photo decoding remained functional.
-- Simulated live camera decoding, permission denial, delayed permission cleanup, Safari preview recovery, torch UI, and camera switching remained functional.
+- 17/17 browser, barcode, nutrition, food-search, serving-math, import, chart, and camera tests passed.
 
-### Static and deployment audit
+### Focused camera lifecycle suite
 
-- 61/61 checks passed.
-- JavaScript syntax passed for the app, service worker, configuration, and scanner engine.
-- Manifest and all root icons validated.
-- Every HTML runtime reference resolved to an included file.
-- Scanner license included.
+- Permission request survived a synthetic `pagehide` transition.
+- Active camera stream survived a synthetic `pagehide` transition.
+- iPhone user agent received minimal initial camera constraints.
+- Simulated Safari `video.play()` rejection preserved the live stream and displayed **Start preview**.
+- Explicit **Close camera** stopped the media track.
+
+### Static/deployment audit
+
+- 61/61 deployment checks passed.
+- 83/83 source audit checks passed.
+- JavaScript syntax passed.
+- Required root files, manifest icons, scanner engine, service-worker references, and license passed.
 - Credential/private-key scan passed.
 
-## Remaining physical-device validation
+## Testing boundary
 
-The development environment cannot operate the physical iPhone camera or reproduce Apple’s exact installed-PWA cache. After deployment, confirm:
+The development environment cannot operate the physical camera on the user's iPhone or reproduce Apple's exact permission sheet and installed-PWA process. The exact teardown path was reproduced by dispatching the lifecycle event that previously stopped the stream, and the repaired build preserved the live track. Final verification still requires one scan on the deployed HTTPS site.
 
-1. Settings displays **Version 1.6.1**.
-2. Safari asks for camera permission.
-3. The rear-camera preview remains open.
-4. A UPC/EAN barcode populates the number and generates nutrition.
+## On-device acceptance check
 
-If Settings still shows an older version, Safari is loading the previous deployment rather than this hotfix.
+1. Open the deployed site directly in Safari.
+2. Confirm Settings displays **Version 1.6.2**.
+3. Open **Log → Barcode → Use camera**.
+4. Tap **Allow**.
+5. Confirm the camera view remains open.
+6. If Safari pauses the preview, tap **Start preview**; no second permission request should be required.
+7. Scan a UPC/EAN and confirm Nutrition Facts are generated.
+8. Tap **Close camera** and confirm the iPhone camera indicator turns off.
