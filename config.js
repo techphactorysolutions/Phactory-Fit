@@ -1,7 +1,7 @@
-// Optional production integration.
-// Set this to your compliant serverless proxy URL when one is available.
-// The proxy should accept ?barcode=UPC_OR_EAN and return an Open Food Facts
-// product response or a normalized product object.
+// Optional production override for barcode product lookup.
+// Leave blank to use PhactoryFit's direct, read-only public Open Food Facts lookup.
+// When set, this proxy is attempted first and should accept ?barcode=UPC_OR_EAN,
+// returning either an Open Food Facts response or a normalized product object.
 window.PHACTORYFIT_CONFIG = {
   offProxyUrl: ''
 };

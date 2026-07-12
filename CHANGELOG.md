@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.3.0 — July 11, 2026
+
+- Replaced full-frame-only live decoding with a high-resolution center-crop scan loop
+- Added two-read barcode confirmation to reduce partial and false detections
+- Added rear-camera constraint fallbacks for iPhone Safari
+- Added conditional continuous-focus and zoom optimization
+- Added flashlight control when torch support is available
+- Added camera switching when multiple video inputs are available
+- Added native detector plus bundled ZXing fallback scanning
+- Added multi-pass barcode photo decoding with crop and contrast attempts
+- Added direct read-only Open Food Facts lookup when no proxy is configured
+- Kept optional proxy-first behavior through `config.js`
+- Corrected per-serving nutrition calculations from per-100-gram data
+- Added clearer scan status, positioning, lighting, and timeout guidance
+- Fixed a late-stream cleanup race when the modal closes during camera permission
+- Updated the application and service-worker cache version to v1.3.0
+
 ## v1.2.0 — July 11, 2026
 
 - Replaced the iPhone Home Screen fallback letter with explicit PhactoryFit icon assets

@@ -196,8 +196,14 @@ let toastTimer;
 let activeMediaStream = null;
 let activeBarcodeControls = null;
 let activeBarcodeTimeout = null;
+let activeBarcodeReader = null;
+let activeBarcodeLoop = null;
 let barcodeScanSession = 0;
 let barcodeCameraStarting = false;
+let barcodeTorchOn = false;
+let barcodeVideoDevices = [];
+let preferredBarcodeDeviceId = '';
+let barcodeCandidate = {code:'', seenAt:0, count:0};
 let modalContext = {meal:'Breakfast'};
 
 function saveState() {
@@ -548,9 +554,14 @@ function stopBarcodeCamera() {
   barcodeScanSession += 1;
   barcodeCameraStarting = false;
   if (activeBarcodeTimeout) clearTimeout(activeBarcodeTimeout);
+  if (activeBarcodeLoop) clearTimeout(activeBarcodeLoop);
   activeBarcodeTimeout = null;
+  activeBarcodeLoop = null;
   try { activeBarcodeControls?.stop?.(); } catch (error) { console.warn('Barcode controls did not stop cleanly', error); }
   activeBarcodeControls = null;
+  activeBarcodeReader = null;
+  barcodeTorchOn = false;
+  barcodeCandidate = {code:'',seenAt:0,count:0};
   activeMediaStream?.getTracks?.().forEach(track => track.stop());
   activeMediaStream = null;
   const video = $('#barcodeVideo');
@@ -560,6 +571,14 @@ function stopBarcodeCamera() {
   }
   const shell = $('#barcodeCameraShell');
   if (shell) shell.hidden = true;
+  const torchButton = $('#barcodeTorch');
+  if (torchButton) {
+    torchButton.hidden = true;
+    torchButton.textContent = 'Turn on light';
+    torchButton.setAttribute('aria-pressed', 'false');
+  }
+  const switchButton = $('#barcodeSwitchCamera');
+  if (switchButton) switchButton.hidden = true;
   setBarcodeCameraButton(false);
 }
 
@@ -597,7 +616,7 @@ function foodModal(meal) {
 }
 
 function barcodeModal(meal) {
-  return `<div class="modal-form"><p class="form-note">Enter a UPC/EAN code, scan it live with the rear camera, or take a barcode photo. Known barcodes work offline. Unknown products can be saved once and remembered on this device.</p><label>Meal<select id="barcodeMeal">${mealOptions(meal)}</select></label><label>Barcode<input id="barcodeInput" inputmode="numeric" autocomplete="off" placeholder="e.g. 049000050103"></label><div class="inline-actions"><button type="button" class="primary-button" id="lookupBarcode">Look up</button><button type="button" class="secondary-button" id="cameraBarcode" aria-pressed="false">Use camera</button></div><label class="secondary-button file-label barcode-photo-button">Take barcode photo<input id="barcodePhotoInput" type="file" accept="image/*" capture="environment"></label><div id="barcodeCameraShell" class="barcode-camera-shell" hidden><video id="barcodeVideo" playsinline muted autoplay aria-label="Live barcode camera preview"></video><div class="barcode-scan-guide" aria-hidden="true"></div></div><div id="barcodeResult" role="status" aria-live="polite"></div></div>`;
+  return `<div class="modal-form"><p class="form-note">Scan a UPC or EAN with the rear camera, take a clear barcode photo, or type the number. PhactoryFit remembers products locally after the first successful lookup.</p><label>Meal<select id="barcodeMeal">${mealOptions(meal)}</select></label><label>Barcode<input id="barcodeInput" inputmode="numeric" autocomplete="off" enterkeyhint="search" maxlength="18" placeholder="e.g. 049000050103"></label><div class="inline-actions"><button type="button" class="primary-button" id="lookupBarcode">Look up</button><button type="button" class="secondary-button" id="cameraBarcode" aria-pressed="false">Use camera</button></div><label class="secondary-button file-label barcode-photo-button">Take barcode photo<input id="barcodePhotoInput" type="file" accept="image/*" capture="environment"></label><div id="barcodeCameraShell" class="barcode-camera-shell" hidden><video id="barcodeVideo" playsinline muted autoplay aria-label="Live barcode camera preview"></video><div class="barcode-scan-guide" aria-hidden="true"><span>Align barcode here</span></div><div class="barcode-camera-controls"><button type="button" id="barcodeTorch" class="camera-control" hidden>Turn on light</button><button type="button" id="barcodeSwitchCamera" class="camera-control" hidden>Switch camera</button></div></div><div id="barcodeResult" role="status" aria-live="polite"></div></div>`;
 }
 
 function workoutModal() {
@@ -648,27 +667,6 @@ function showCustomFoodForm(barcode = '', meal = modalContext.meal) {
   $('#modalContent').innerHTML = `<form id="customFoodForm" class="modal-form">${barcode ? `<p class="form-note">This food will be linked to barcode ${escapeHtml(barcode)} for future scans.</p>` : ''}<input name="barcode" type="hidden" value="${escapeHtml(barcode)}"><input name="meal" type="hidden" value="${selectedMeal}"><label>Food name<input name="name" maxlength="200" required></label><label>Brand<input name="brand" maxlength="200" value="Custom"></label><label>Serving description<input name="serving" maxlength="200" placeholder="1 serving, 100 g, 1 cup" required></label><div class="two-col"><label>Calories<input name="calories" type="number" step="0.1" min="0" max="100000" required></label><label>Protein (g)<input name="protein" type="number" step="0.1" min="0" max="10000" required></label></div><div class="two-col"><label>Carbs (g)<input name="carbs" type="number" step="0.1" min="0" max="10000" value="0" required></label><label>Fat (g)<input name="fat" type="number" step="0.1" min="0" max="10000" value="0" required></label></div><div class="two-col"><label>Fiber (g)<input name="fiber" type="number" step="0.1" min="0" max="10000" value="0"></label><label>Sodium (mg)<input name="sodium" type="number" step="0.1" min="0" max="1000000" value="0"></label></div><button class="primary-button" type="submit">Save food</button></form>`;
 }
 
-function servingFactor(servingText) {
-  const match = String(servingText || '').match(/(\d+(?:\.\d+)?)\s*(g|ml)\b/i);
-  return match ? Number(match[1]) / 100 : 1;
-}
-
-function productNutrient(product, nutrientNames, factor = 1) {
-  const nutrition = product.nutriments || product.nutrition || {};
-  for (const name of nutrientNames) {
-    const directCandidates = [product[name], nutrition[name], nutrition[`${name}_serving`]];
-    for (const candidate of directCandidates) {
-      const number = Number(candidate);
-      if (Number.isFinite(number)) return number;
-    }
-  }
-  for (const name of nutrientNames) {
-    const number = Number(nutrition[`${name}_100g`]);
-    if (Number.isFinite(number)) return number * factor;
-  }
-  return 0;
-}
-
 async function fetchWithTimeout(url, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -679,11 +677,91 @@ async function fetchWithTimeout(url, timeoutMs = 10000) {
   }
 }
 
+function servingAmountGrams(product, servingText) {
+  const explicit = Number(product?.serving_quantity);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const match = String(servingText || '').match(/(?:^|\(|\s)(\d+(?:\.\d+)?)\s*(g|ml)\b/i);
+  return match ? Number(match[1]) : 100;
+}
+
+function productNutrientForServing(product, names, factor = 1) {
+  const nutrition = product?.nutriments || product?.nutrition || {};
+  for (const name of names) {
+    const direct = Number(product?.[name]);
+    if (Number.isFinite(direct)) return direct;
+    const serving = Number(nutrition[`${name}_serving`]);
+    if (Number.isFinite(serving)) return serving;
+  }
+  for (const name of names) {
+    const per100 = Number(nutrition[`${name}_100g`] ?? nutrition[name]);
+    if (Number.isFinite(per100)) return per100 * factor;
+  }
+  return 0;
+}
+
+function normalizeOpenFoodFactsProduct(product, code) {
+  if (!product || (!product.product_name && !product.name)) return null;
+  const rawServing = String(product.serving_size || product.serving || '').trim();
+  const grams = servingAmountGrams(product, rawServing);
+  const factor = grams / 100;
+  const serving = rawServing || `${round(grams, 1)} g`;
+  const nutrition = product.nutriments || product.nutrition || {};
+  const sodiumServingGrams = Number(nutrition.sodium_serving);
+  const sodium100Grams = Number(nutrition.sodium_100g ?? nutrition.sodium);
+  const sodiumMg = Number.isFinite(Number(product.sodium_mg))
+    ? Number(product.sodium_mg)
+    : Number.isFinite(Number(nutrition.sodium_mg_serving))
+      ? Number(nutrition.sodium_mg_serving)
+      : Number.isFinite(sodiumServingGrams)
+        ? sodiumServingGrams * 1000
+        : Number.isFinite(sodium100Grams) ? sodium100Grams * factor * 1000 : 0;
+
+  return normalizeFood({
+    id:`off-${code}`,
+    name:product.product_name || product.name,
+    brand:product.brands || product.brand || 'Open Food Facts',
+    serving,
+    calories:productNutrientForServing(product, ['calories','energy-kcal'], factor),
+    protein:productNutrientForServing(product, ['protein','proteins'], factor),
+    carbs:productNutrientForServing(product, ['carbs','carbohydrates'], factor),
+    fat:productNutrientForServing(product, ['fat'], factor),
+    fiber:productNutrientForServing(product, ['fiber'], factor),
+    sugar:productNutrientForServing(product, ['sugar','sugars'], factor),
+    sodium:sodiumMg,
+    aliases:[],source:'Open Food Facts',barcode:code
+  }, `off-${code}`);
+}
+
+async function fetchBarcodeProduct(code) {
+  const proxy = window.PHACTORYFIT_CONFIG?.offProxyUrl?.trim();
+  const urls = [];
+  if (proxy) urls.push(`${proxy}${proxy.includes('?') ? '&' : '?'}barcode=${encodeURIComponent(code)}`);
+  const fields = 'code,status,status_verbose,product_name,brands,serving_size,serving_quantity,nutriments';
+  urls.push(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${encodeURIComponent(fields)}&app_name=PhactoryFit&app_version=1.3.0`);
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(url, 12000);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (data?.status === 0) return {found:false, product:null};
+      const product = data?.product || data;
+      if (!product || (!product.product_name && !product.name)) return {found:false, product:null};
+      return {found:true, product};
+    } catch (error) {
+      lastError = error;
+      console.warn('Barcode product source failed', error);
+    }
+  }
+  throw lastError || new Error('Product database unavailable');
+}
+
 async function lookupBarcode(code) {
   const result = $('#barcodeResult');
+  if (!result) return;
   const normalizedCode = String(code || '').replace(/\D/g, '');
   if (!/^\d{8,14}$/.test(normalizedCode)) {
-    result.innerHTML = '<p class="form-note">Enter a valid 8–14 digit barcode.</p>';
+    result.innerHTML = '<p class="form-note">Enter a valid 8–14 digit UPC or EAN.</p>';
     return;
   }
   const selectedMeal = MEALS.includes($('#barcodeMeal')?.value) ? $('#barcodeMeal').value : modalContext.meal;
@@ -695,58 +773,38 @@ async function lookupBarcode(code) {
     return;
   }
 
-  const proxy = window.PHACTORYFIT_CONFIG?.offProxyUrl?.trim();
-  if (proxy) {
-    result.innerHTML = '<p class="form-note">Looking up product…</p>';
-    try {
-      const response = await fetchWithTimeout(`${proxy}${proxy.includes('?') ? '&' : '?'}barcode=${encodeURIComponent(normalizedCode)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      const product = data.product || data;
-      if (!product || (!product.product_name && !product.name)) throw new Error('Product not found');
-      const serving = product.serving_size || product.serving || '100 g';
-      const factor = servingFactor(serving);
-      const sodiumGrams = productNutrient(product, ['sodium'], factor);
-      const normalizedFood = normalizeFood({
-        id:`off-${normalizedCode}`,
-        name:product.product_name || product.name,
-        brand:product.brands || product.brand || 'Open Food Facts',
-        serving,
-        calories:productNutrient(product, ['calories','energy-kcal'], factor),
-        protein:productNutrient(product, ['protein','proteins'], factor),
-        carbs:productNutrient(product, ['carbs','carbohydrates'], factor),
-        fat:productNutrient(product, ['fat'], factor),
-        fiber:productNutrient(product, ['fiber'], factor),
-        sugar:productNutrient(product, ['sugar','sugars'], factor),
-        sodium:Number(product.sodium_mg ?? product.nutriments?.sodium_mg_serving ?? sodiumGrams * 1000),
-        aliases:[],source:'Open Food Facts',barcode:normalizedCode
-      }, `off-${normalizedCode}`);
-      if (!normalizedFood) throw new Error('Invalid product data');
-      const existingIndex = state.customFoods.findIndex(food => food.id === normalizedFood.id);
+  result.innerHTML = '<p class="form-note camera-status">Looking up product nutrition…</p>';
+  try {
+    const response = await fetchBarcodeProduct(normalizedCode);
+    if (response.found) {
+      const normalizedFood = normalizeOpenFoodFactsProduct(response.product, normalizedCode);
+      if (!normalizedFood) throw new Error('Product nutrition could not be normalized');
+      const existingIndex = state.customFoods.findIndex(food => food.id === normalizedFood.id || food.barcode === normalizedCode);
       if (existingIndex >= 0) state.customFoods[existingIndex] = normalizedFood;
       else state.customFoods.push(normalizedFood);
       saveState();
-      result.innerHTML = `<div class="search-result"><strong>${escapeHtml(normalizedFood.name)}</strong><small>${escapeHtml(normalizedFood.brand)} · ${escapeHtml(normalizedFood.serving)} · ${round(normalizedFood.calories)} kcal · ${round(normalizedFood.protein, 1)}g protein</small></div><button type="button" id="addBarcodeFood" class="primary-button">Add product</button>`;
+      result.innerHTML = `<div class="search-result"><strong>${escapeHtml(normalizedFood.name)}</strong><small>${escapeHtml(normalizedFood.brand)} · ${escapeHtml(normalizedFood.serving)} · ${round(normalizedFood.calories)} kcal · ${round(normalizedFood.protein, 1)}g protein</small></div><p class="barcode-source-note">Community nutrition data—compare it with the package label before saving.</p><button type="button" id="addBarcodeFood" class="primary-button">Add product</button>`;
       $('#addBarcodeFood').onclick = () => showFoodQuantity(normalizedFood, selectedMeal);
       return;
-    } catch (error) {
-      console.warn('Barcode lookup failed', error);
     }
+    result.innerHTML = '<p class="form-note">The barcode scanned correctly, but this product is not in the food database yet.</p><button type="button" id="teachBarcodeFood" class="primary-button">Create and remember food</button>';
+  } catch (error) {
+    console.warn('Barcode lookup failed', error);
+    result.innerHTML = '<p class="form-note">The barcode scanned correctly, but the online product database could not be reached. You can still create the food once and PhactoryFit will remember it offline.</p><button type="button" id="teachBarcodeFood" class="primary-button">Create and remember food</button>';
   }
-
-  result.innerHTML = '<p class="form-note">This barcode is not in your local library yet.</p><button type="button" id="teachBarcodeFood" class="primary-button">Create and remember food</button>';
   $('#teachBarcodeFood').onclick = () => showCustomFoodForm(normalizedCode, selectedMeal);
 }
 
 function barcodeCameraErrorMessage(error) {
   const name = String(error?.name || '');
-  if (!window.isSecureContext) return 'Camera access requires the secure HTTPS version of PhactoryFit. Open the GitHub Pages link instead of a downloaded HTML file.';
-  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return 'Camera permission was blocked. Allow camera access for this site in Safari or browser settings, then tap Use camera again.';
+  if (!window.isSecureContext) return 'Camera access requires HTTPS. Open the deployed GitHub Pages site in Safari instead of opening the HTML file directly.';
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') return 'Camera permission is blocked. On iPhone, open Settings → Safari → Camera and allow access, then reopen PhactoryFit.';
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No usable camera was found on this device.';
-  if (name === 'NotReadableError' || name === 'TrackStartError') return 'The camera is busy or unavailable. Close other camera apps and try again.';
-  if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The rear camera could not start with the requested settings. Try again after rotating the phone.';
-  if (name === 'ScannerLibraryUnavailable') return 'The barcode scanner did not finish loading. Refresh PhactoryFit once while online, then try again.';
-  return 'The camera could not start. Check camera permission and try again.';
+  if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') return 'The camera is busy or unavailable. Close other camera apps, return to PhactoryFit, and try again.';
+  if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') return 'The requested rear-camera mode was unavailable. PhactoryFit will retry with simpler camera settings.';
+  if (name === 'ScannerLibraryUnavailable') return 'The bundled barcode scanner did not load. Refresh PhactoryFit once while online, then reopen the scanner.';
+  if (name === 'TimeoutError') return 'No barcode was detected. Hold the package 6–10 inches away, avoid glare, and keep the entire barcode inside the frame.';
+  return 'The barcode camera could not start. Check camera permission, lighting, and the secure HTTPS address, then try again.';
 }
 
 function normalizeScannedBarcode(value) {
@@ -754,10 +812,212 @@ function normalizeScannedBarcode(value) {
   return code.length >= 8 && code.length <= 14 ? code : '';
 }
 
+function barcodeFormatLabel(scanResult) {
+  try {
+    const raw = typeof scanResult?.getBarcodeFormat === 'function' ? scanResult.getBarcodeFormat() : scanResult?.format;
+    if (typeof raw === 'string') return raw;
+    return window.ZXingBrowser?.BarcodeFormat?.[raw] || '';
+  } catch {
+    return '';
+  }
+}
+
+function registerBarcodeCandidate(rawValue) {
+  const code = normalizeScannedBarcode(rawValue);
+  if (!code) return '';
+  const now = Date.now();
+  if (barcodeCandidate.code === code && now - barcodeCandidate.seenAt < 1800) {
+    barcodeCandidate.count += 1;
+  } else {
+    barcodeCandidate = {code, seenAt:now, count:1};
+  }
+  barcodeCandidate.seenAt = now;
+  return barcodeCandidate.count >= 2 ? code : '';
+}
+
+function barcodeReaderInstance() {
+  if (activeBarcodeReader) return activeBarcodeReader;
+  if (!window.ZXingBrowser) {
+    const error = new Error('ZXing browser scanner unavailable');
+    error.name = 'ScannerLibraryUnavailable';
+    throw error;
+  }
+  const Reader = window.ZXingBrowser.BrowserMultiFormatOneDReader || window.ZXingBrowser.BrowserMultiFormatReader;
+  if (!Reader) {
+    const error = new Error('ZXing browser scanner unavailable');
+    error.name = 'ScannerLibraryUnavailable';
+    throw error;
+  }
+  activeBarcodeReader = new Reader(undefined, {delayBetweenScanAttempts:90, delayBetweenScanSuccess:300});
+  return activeBarcodeReader;
+}
+
+function scannerCanvas(id = 'barcodeFrameCanvas') {
+  let canvas = document.getElementById(id);
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.id = id;
+    canvas.hidden = true;
+    canvas.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(canvas);
+  }
+  return canvas;
+}
+
+function drawBarcodeRegion(video, canvas, fullFrame = false, contrast = false) {
+  const sourceWidth = video.videoWidth || 1280;
+  const sourceHeight = video.videoHeight || 720;
+  if (!sourceWidth || !sourceHeight) return false;
+
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceWidth;
+  let sh = sourceHeight;
+  if (!fullFrame) {
+    sx = sourceWidth * 0.04;
+    sy = sourceHeight * 0.29;
+    sw = sourceWidth * 0.92;
+    sh = sourceHeight * 0.42;
+  }
+
+  const targetWidth = Math.min(1280, Math.max(720, Math.round(sw)));
+  const targetHeight = Math.max(220, Math.round(targetWidth * sh / sw));
+  if (canvas.width !== targetWidth) canvas.width = targetWidth;
+  if (canvas.height !== targetHeight) canvas.height = targetHeight;
+  const context = canvas.getContext('2d', {willReadFrequently:true});
+  if (!context) return false;
+  context.save();
+  context.filter = contrast ? 'grayscale(1) contrast(1.55)' : 'none';
+  context.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+  context.restore();
+  return true;
+}
+
+function decodeBarcodeCanvas(reader, canvas) {
+  try {
+    const scanResult = reader.decodeFromCanvas(canvas);
+    const text = typeof scanResult?.getText === 'function' ? scanResult.getText() : scanResult?.text;
+    return {text, format:barcodeFormatLabel(scanResult)};
+  } catch {
+    return null;
+  }
+}
+
+async function requestBarcodeStream(deviceId = '') {
+  const deviceConstraint = deviceId ? {deviceId:{exact:deviceId}} : {facingMode:{ideal:'environment'}};
+  const attempts = [
+    {audio:false,video:{...deviceConstraint,width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:30,max:30}}},
+    {audio:false,video:deviceId ? {deviceId:{exact:deviceId}} : {facingMode:'environment'}},
+    {audio:false,video:true}
+  ];
+  let lastError;
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (error) {
+      lastError = error;
+      if (['NotAllowedError','PermissionDeniedError','SecurityError','NotReadableError'].includes(String(error?.name || ''))) throw error;
+    }
+  }
+  throw lastError || new DOMException('Camera unavailable', 'NotFoundError');
+}
+
+async function waitForVideoReady(video, timeoutMs = 7000) {
+  if (video.readyState >= 2 && video.videoWidth) return;
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new DOMException('Camera preview did not become ready', 'AbortError'));
+    }, timeoutMs);
+    const ready = () => {
+      if (video.readyState < 2 && !video.videoWidth) return;
+      cleanup();
+      resolve();
+    };
+    const failed = () => {
+      cleanup();
+      reject(video.error || new DOMException('Camera preview failed', 'AbortError'));
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      video.removeEventListener('loadedmetadata', ready);
+      video.removeEventListener('canplay', ready);
+      video.removeEventListener('error', failed);
+    };
+    video.addEventListener('loadedmetadata', ready);
+    video.addEventListener('canplay', ready);
+    video.addEventListener('error', failed);
+  });
+}
+
+async function optimizeBarcodeCamera(track) {
+  if (!track) return;
+  try {
+    const capabilities = track.getCapabilities?.() || {};
+    const advanced = {};
+    if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes('continuous')) advanced.focusMode = 'continuous';
+    if (capabilities.zoom && Number.isFinite(capabilities.zoom.min) && Number.isFinite(capabilities.zoom.max)) {
+      advanced.zoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 1.15));
+    }
+    if (Object.keys(advanced).length) await track.applyConstraints?.({advanced:[advanced]});
+
+    const torchButton = $('#barcodeTorch');
+    const hasTorch = Boolean(capabilities.torch);
+    if (torchButton) {
+      torchButton.hidden = !hasTorch;
+      torchButton.textContent = 'Turn on light';
+      torchButton.setAttribute('aria-pressed', 'false');
+    }
+  } catch (error) {
+    console.warn('Optional camera optimization was unavailable', error);
+  }
+}
+
+async function refreshBarcodeDevices() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices?.();
+    barcodeVideoDevices = (devices || []).filter(device => device.kind === 'videoinput');
+  } catch {
+    barcodeVideoDevices = [];
+  }
+  const switchButton = $('#barcodeSwitchCamera');
+  if (switchButton) switchButton.hidden = barcodeVideoDevices.length < 2;
+}
+
+async function toggleBarcodeTorch() {
+  const track = activeMediaStream?.getVideoTracks?.()[0];
+  const button = $('#barcodeTorch');
+  if (!track || !button) return;
+  barcodeTorchOn = !barcodeTorchOn;
+  try {
+    await track.applyConstraints({advanced:[{torch:barcodeTorchOn}]});
+    button.textContent = barcodeTorchOn ? 'Turn off light' : 'Turn on light';
+    button.setAttribute('aria-pressed', barcodeTorchOn ? 'true' : 'false');
+  } catch (error) {
+    barcodeTorchOn = false;
+    button.textContent = 'Light unavailable';
+    button.hidden = true;
+    console.warn('Torch control unavailable', error);
+  }
+}
+
+async function switchBarcodeCamera() {
+  if (barcodeVideoDevices.length < 2) return;
+  const currentId = activeMediaStream?.getVideoTracks?.()[0]?.getSettings?.().deviceId || preferredBarcodeDeviceId;
+  const currentIndex = Math.max(0, barcodeVideoDevices.findIndex(device => device.deviceId === currentId));
+  preferredBarcodeDeviceId = barcodeVideoDevices[(currentIndex + 1) % barcodeVideoDevices.length]?.deviceId || '';
+  stopBarcodeCamera();
+  await startBarcodeCamera(true);
+}
+
 async function scanBarcodePhoto(file) {
   const result = $('#barcodeResult');
   if (!result || !file) return;
-  if (!String(file.type || '').startsWith('image/')) {
+  if (file.size > 25 * 1024 * 1024) {
+    result.innerHTML = '<p class="form-note">That image is too large. Take a closer barcode photo and try again.</p>';
+    return;
+  }
+  if (file.type && !String(file.type).startsWith('image/')) {
     result.innerHTML = '<p class="form-note">Choose a photo containing a UPC or EAN barcode.</p>';
     return;
   }
@@ -765,26 +1025,54 @@ async function scanBarcodePhoto(file) {
   stopBarcodeCamera();
   result.innerHTML = '<p class="form-note camera-status">Reading barcode photo…</p>';
   let objectUrl = '';
-  let bitmap = null;
+  let image = null;
   try {
+    objectUrl = URL.createObjectURL(file);
+    image = new Image();
+    image.decoding = 'async';
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new DOMException('Image could not be opened', 'NotReadableError'));
+      image.src = objectUrl;
+    });
+
     let rawValue = '';
-    if ('BarcodeDetector' in window && globalThis.createImageBitmap) {
-      bitmap = await createImageBitmap(file);
-      const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
-      const codes = await detector.detect(bitmap);
-      rawValue = codes.find(code => normalizeScannedBarcode(code.rawValue))?.rawValue || '';
+    if ('BarcodeDetector' in window) {
+      try {
+        const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
+        const codes = await detector.detect(image);
+        rawValue = codes.find(code => normalizeScannedBarcode(code.rawValue))?.rawValue || '';
+      } catch {
+        rawValue = '';
+      }
     }
 
     if (!rawValue) {
-      if (!window.ZXingBrowser?.BrowserMultiFormatReader) {
-        const error = new Error('ZXing browser scanner unavailable');
-        error.name = 'ScannerLibraryUnavailable';
-        throw error;
+      const reader = barcodeReaderInstance();
+      const canvas = scannerCanvas('barcodePhotoCanvas');
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      const attempts = [
+        [0, 0, width, height, false],
+        [width * .03, height * .25, width * .94, height * .5, false],
+        [0, 0, width, height, true],
+        [width * .03, height * .25, width * .94, height * .5, true]
+      ];
+      for (const [sx, sy, sw, sh, contrast] of attempts) {
+        const targetWidth = Math.min(1800, Math.max(900, Math.round(sw)));
+        canvas.width = targetWidth;
+        canvas.height = Math.max(260, Math.round(targetWidth * sh / sw));
+        const context = canvas.getContext('2d', {willReadFrequently:true});
+        context.save();
+        context.filter = contrast ? 'grayscale(1) contrast(1.65)' : 'none';
+        context.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+        context.restore();
+        const decoded = decodeBarcodeCanvas(reader, canvas);
+        if (decoded?.text && normalizeScannedBarcode(decoded.text)) {
+          rawValue = decoded.text;
+          break;
+        }
       }
-      objectUrl = URL.createObjectURL(file);
-      const reader = new window.ZXingBrowser.BrowserMultiFormatReader();
-      const decoded = await reader.decodeFromImageUrl(objectUrl);
-      rawValue = typeof decoded?.getText === 'function' ? decoded.getText() : decoded?.text;
     }
 
     const code = normalizeScannedBarcode(rawValue);
@@ -795,107 +1083,84 @@ async function scanBarcodePhoto(file) {
   } catch (error) {
     console.warn('Barcode photo scan failed', error);
     const currentResult = $('#barcodeResult');
-    if (currentResult) currentResult.innerHTML = `<p class="form-note">${escapeHtml(error?.name === 'ScannerLibraryUnavailable' ? barcodeCameraErrorMessage(error) : 'No barcode was found in that photo. Fill the frame with the barcode, avoid glare, and try again.')}</p>`;
+    if (currentResult) currentResult.innerHTML = `<p class="form-note">${escapeHtml(error?.name === 'ScannerLibraryUnavailable' ? barcodeCameraErrorMessage(error) : 'No barcode was found in that photo. Fill most of the image with the barcode, keep it sharp, and avoid glare.')}</p>`;
   } finally {
-    bitmap?.close?.();
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     const input = $('#barcodePhotoInput');
     if (input) input.value = '';
   }
 }
 
-async function completeBarcodeScan(rawValue, session) {
+async function completeBarcodeScan(rawValue, session, format = '') {
   if (session !== barcodeScanSession || !modal.open) return;
   const code = normalizeScannedBarcode(rawValue);
   if (!code) return;
   const input = $('#barcodeInput');
   if (input) input.value = code;
+  navigator.vibrate?.(70);
   stopBarcodeCamera();
+  const result = $('#barcodeResult');
+  if (result) result.innerHTML = `<p class="form-note camera-status">Barcode detected${format ? ` (${escapeHtml(format.replaceAll('_', '-'))})` : ''}: ${escapeHtml(code)}. Looking up product…</p>`;
   await lookupBarcode(code);
 }
 
-async function startNativeBarcodeScanner(video, result, session) {
-  const detector = new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});
-  activeMediaStream = await navigator.mediaDevices.getUserMedia({
-    audio:false,
-    video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
-  });
-  if (session !== barcodeScanSession || !modal.open) {
-    stopBarcodeCamera();
-    return;
+async function runBarcodeDecodeLoop(video, result, session) {
+  const reader = barcodeReaderInstance();
+  const cropCanvas = scannerCanvas('barcodeFrameCanvas');
+  const fullCanvas = scannerCanvas('barcodeFullFrameCanvas');
+  let nativeDetector = null;
+  if ('BarcodeDetector' in window) {
+    try {
+      const supported = await window.BarcodeDetector.getSupportedFormats?.();
+      const wanted = ['ean_13','ean_8','upc_a','upc_e'];
+      const formats = Array.isArray(supported) ? wanted.filter(format => supported.includes(format)) : wanted;
+      if (formats.length) nativeDetector = new window.BarcodeDetector({formats});
+    } catch {
+      nativeDetector = null;
+    }
   }
-  video.srcObject = activeMediaStream;
-  await video.play();
-  result.innerHTML = '<p class="form-note camera-status">Camera ready. Center the barcode inside the frame and hold still.</p>';
+
+  let attempt = 0;
   const started = Date.now();
-  while (Date.now() - started < 30000 && session === barcodeScanSession && modal.open && activeMediaStream) {
-    const codes = await detector.detect(video);
-    if (codes.length && normalizeScannedBarcode(codes[0].rawValue)) {
-      await completeBarcodeScan(codes[0].rawValue, session);
-      return;
+  while (session === barcodeScanSession && modal.open && activeMediaStream) {
+    attempt += 1;
+    if (video.readyState >= 2 && video.videoWidth) {
+      let decoded = null;
+      if (nativeDetector && attempt % 3 === 0) {
+        try {
+          const codes = await nativeDetector.detect(video);
+          const match = codes.find(code => normalizeScannedBarcode(code.rawValue));
+          if (match) decoded = {text:match.rawValue,format:match.format || ''};
+        } catch {
+          nativeDetector = null;
+        }
+      }
+      if (!decoded && drawBarcodeRegion(video, cropCanvas, false, attempt % 4 === 0)) decoded = decodeBarcodeCanvas(reader, cropCanvas);
+      if (!decoded && attempt % 5 === 0 && drawBarcodeRegion(video, fullCanvas, true, attempt % 10 === 0)) decoded = decodeBarcodeCanvas(reader, fullCanvas);
+
+      if (decoded?.text) {
+        const confirmed = registerBarcodeCandidate(decoded.text);
+        if (confirmed) {
+          await completeBarcodeScan(confirmed, session, decoded.format);
+          return;
+        }
+        result.innerHTML = '<p class="form-note camera-status">Barcode found—hold still for confirmation…</p>';
+      }
     }
-    await new Promise(resolve => setTimeout(resolve, 180));
+    if (Date.now() - started > 45000) throw new DOMException('No barcode detected before timeout.', 'TimeoutError');
+    await new Promise(resolve => {
+      activeBarcodeLoop = setTimeout(resolve, 110);
+    });
   }
-  if (session === barcodeScanSession) throw new DOMException('No barcode detected before timeout.', 'TimeoutError');
 }
 
-async function startZxingBarcodeScanner(video, result, session) {
-  if (!window.ZXingBrowser?.BrowserMultiFormatReader) {
-    const error = new Error('ZXing browser scanner unavailable');
-    error.name = 'ScannerLibraryUnavailable';
-    throw error;
-  }
-
-  const reader = new window.ZXingBrowser.BrowserMultiFormatReader(undefined, {
-    delayBetweenScanAttempts: 120,
-    delayBetweenScanSuccess: 500
-  });
-  if (window.ZXingBrowser.BarcodeFormat) {
-    reader.possibleFormats = [
-      window.ZXingBrowser.BarcodeFormat.EAN_13,
-      window.ZXingBrowser.BarcodeFormat.EAN_8,
-      window.ZXingBrowser.BarcodeFormat.UPC_A,
-      window.ZXingBrowser.BarcodeFormat.UPC_E
-    ];
-  }
-
-  const controls = await reader.decodeFromConstraints({
-    audio:false,
-    video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
-  }, video, (scanResult, scanError, callbackControls) => {
-    if (session !== barcodeScanSession || !modal.open) {
-      callbackControls?.stop?.();
-      return;
-    }
-    if (!scanResult) return;
-    const text = typeof scanResult.getText === 'function' ? scanResult.getText() : scanResult.text;
-    if (!normalizeScannedBarcode(text)) return;
-    activeBarcodeControls = callbackControls || activeBarcodeControls;
-    void completeBarcodeScan(text, session);
-  });
-
-  if (session !== barcodeScanSession || !modal.open) {
-    controls?.stop?.();
-    return;
-  }
-  activeBarcodeControls = controls;
-  activeMediaStream = video.srcObject;
-  result.innerHTML = '<p class="form-note camera-status">Camera ready. Center the barcode inside the frame and hold still.</p>';
-  activeBarcodeTimeout = setTimeout(() => {
-    if (session !== barcodeScanSession) return;
-    stopBarcodeCamera();
-    const currentResult = $('#barcodeResult');
-    if (currentResult) currentResult.innerHTML = '<p class="form-note">No barcode was detected. Improve the lighting, move the package slightly farther away, and try again.</p>';
-  }, 30000);
-}
-
-async function startBarcodeCamera() {
+async function startBarcodeCamera(forceStart = false) {
   const result = $('#barcodeResult');
   const video = $('#barcodeVideo');
   const shell = $('#barcodeCameraShell');
   if (!result || !video || !shell) return;
 
-  if (barcodeCameraStarting || activeMediaStream || activeBarcodeControls) {
+  if (!forceStart && (barcodeCameraStarting || activeMediaStream || activeBarcodeControls)) {
     stopBarcodeCamera();
     result.innerHTML = '<p class="form-note">Camera stopped.</p>';
     return;
@@ -911,32 +1176,30 @@ async function startBarcodeCamera() {
   stopBarcodeCamera();
   const session = barcodeScanSession;
   barcodeCameraStarting = true;
+  barcodeCandidate = {code:'',seenAt:0,count:0};
   shell.hidden = false;
   setBarcodeCameraButton(true);
-  result.innerHTML = '<p class="form-note camera-status">Requesting camera access…</p>';
+  result.innerHTML = '<p class="form-note camera-status">Requesting rear-camera access…</p>';
 
   try {
-    if ('BarcodeDetector' in window) {
-      try {
-        await startNativeBarcodeScanner(video, result, session);
-      } catch (nativeError) {
-        if (session !== barcodeScanSession) return;
-        const permissionErrors = new Set(['NotAllowedError','PermissionDeniedError','NotFoundError','NotReadableError','SecurityError']);
-        if (permissionErrors.has(String(nativeError?.name || ''))) throw nativeError;
-        console.warn('Native barcode detector unavailable; switching to bundled scanner', nativeError);
-        stopBarcodeCamera();
-        const fallbackSession = barcodeScanSession;
-        barcodeCameraStarting = true;
-        shell.hidden = false;
-        setBarcodeCameraButton(true);
-        result.innerHTML = '<p class="form-note camera-status">Starting camera scanner…</p>';
-        await startZxingBarcodeScanner(video, result, fallbackSession);
-      }
-    } else {
-      await startZxingBarcodeScanner(video, result, session);
+    const requestedStream = await requestBarcodeStream(preferredBarcodeDeviceId);
+    if (session !== barcodeScanSession || !modal.open) {
+      requestedStream?.getTracks?.().forEach(track => track.stop());
+      return;
     }
+    activeMediaStream = requestedStream;
+    video.srcObject = activeMediaStream;
+    await video.play();
+    await waitForVideoReady(video);
+    const track = activeMediaStream.getVideoTracks?.()[0];
+    preferredBarcodeDeviceId = track?.getSettings?.().deviceId || preferredBarcodeDeviceId;
+    await optimizeBarcodeCamera(track);
+    await refreshBarcodeDevices();
+    if (session !== barcodeScanSession || !modal.open) return;
+    result.innerHTML = '<p class="form-note camera-status">Scanning… Keep the full barcode inside the green frame. Move slightly farther away if it looks blurry.</p>';
+    await runBarcodeDecodeLoop(video, result, session);
   } catch (error) {
-    if (session !== barcodeScanSession && !barcodeCameraStarting) return;
+    if (session !== barcodeScanSession) return;
     console.warn('Camera barcode scan failed', error);
     stopBarcodeCamera();
     const currentResult = $('#barcodeResult');
@@ -1213,13 +1476,26 @@ $('#resetButton').addEventListener('click', () => {
 $('#modalContent').addEventListener('click', event => {
   if (event.target.id === 'createFoodButton') showCustomFoodForm('', selectedMealFromCurrentModal());
   if (event.target.id === 'lookupBarcode') lookupBarcode($('#barcodeInput').value);
-  if (event.target.id === 'cameraBarcode') startBarcodeCamera();
+  if (event.target.id === 'cameraBarcode') void startBarcodeCamera();
+  if (event.target.id === 'barcodeTorch') void toggleBarcodeTorch();
+  if (event.target.id === 'barcodeSwitchCamera') void switchBarcodeCamera();
 });
 
 $('#modalContent').addEventListener('change', event => {
   if (event.target.id === 'barcodePhotoInput' && event.target.files?.[0]) {
     void scanBarcodePhoto(event.target.files[0]);
   }
+});
+
+$('#modalContent').addEventListener('keydown', event => {
+  if (event.target.id === 'barcodeInput' && event.key === 'Enter') {
+    event.preventDefault();
+    void lookupBarcode(event.target.value);
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && activeMediaStream) stopBarcodeCamera();
 });
 
 modal.addEventListener('click', event => {
